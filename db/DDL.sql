@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS "tag" (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     -- Constraints
-    CONSTRAINT name_not_empty CHECK (char_length(trim(name)) >= 2)
+    CONSTRAINT name_not_empty CHECK (char_length(trim(name)) >= 1)
 );
 
 -- CONTENT TABLE
