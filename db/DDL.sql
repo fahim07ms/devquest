@@ -55,6 +55,71 @@ EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
+-- Badge Criteria Type
+DO $$ BEGIN
+    CREATE TYPE badge_criteria_type AS ENUM (
+        'question_count',
+        'answer_count',
+        'comment_count',
+        'question_views',
+        'answer_score',
+        'accepted_answer_score',
+        'total_votes_received',
+        'helpful_flags',
+        'consecutive_days_visited'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- Reputation Reason Type
+DO $$ BEGIN
+    CREATE TYPE reputation_reason AS ENUM (
+        'QUESTION_UPVOTED',
+        'QUESTION_DOWNVOTED',
+        'ANSWER_UPVOTED',
+        'ANSWER_DOWNVOTED',
+        'ANSWER_ACCEPTED',
+        'ANSWER_UNACCEPTED',
+        'BOUNTY_OFFERED',
+        'BOUNTY_AWARDED',
+        'DOWNVOTE_GIVEN',
+        'SPAM_PENALTY',
+        'MODERATOR_ADJUSTMENT'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- Reputation Entity Type
+DO $$ BEGIN
+    CREATE TYPE reputation_entity_type AS ENUM (
+        'question',
+        'answer',
+        'bounty',
+        'vote',
+        'flag'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- Notification Type
+DO $$ BEGIN
+    CREATE TYPE notification_type AS ENUM (
+        'NEW_ANSWER',
+        'NEW_COMMENT',
+        'BADGE_EARNED',
+        'ANSWER_ACCEPTED',
+        'BOUNTY_EXPIRING',
+        'BOUNTY_AWARDED',
+        'QUESTION_EDITED',
+        'MENTIONED'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
 -- ENUM END
 
 -- USER TABLE
@@ -256,7 +321,7 @@ CREATE TABLE "badge" (
     name VARCHAR(100) NOT NULL UNIQUE,
     description TEXT NOT NULL,
     badge_tier badge_tier NOT NULL,
-    criteria_type VARCHAR(100) NOT NULL,
+    criteria_type badge_criteria_type NOT NULL,
     criteria_threshold INTEGER NOT NULL,
     icon_url VARCHAR(500),
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -281,8 +346,8 @@ CREATE TABLE "reputation_history" (
     history_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
     change_amount INTEGER NOT NULL,
-    reason VARCHAR(100) NOT NULL,
-    related_entity_type VARCHAR(50),
+    reason reputation_reason NOT NULL,
+    related_entity_type reputation_entity_type NOT NULL,
     related_entity_id UUID,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -296,9 +361,9 @@ CREATE TABLE "notification" (
     recipient_user_id UUID NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
     actor_user_id UUID REFERENCES "user"(user_id) ON DELETE SET NULL,
     notification_type notification_type NOT NULL,
-    notifiable_type VARCHAR(50),
-    notifiable_id UUID,
+    related_entity_id UUID NOT NULL, -- We will derive it from notification_type
     is_read BOOLEAN NOT NULL DEFAULT false,
     action_url VARCHAR(500),
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+

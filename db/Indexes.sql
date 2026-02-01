@@ -71,6 +71,8 @@ CREATE INDEX IF NOT EXISTS idx_badge_award_badge ON badge_award(badge_id);
 -- REPUTATION_HISTORY TABLE INDEXES
 CREATE INDEX IF NOT EXISTS idx_reputation_history_user ON reputation_history(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reputation_history_created ON reputation_history(created_at DESC);
+CREATE INDEX idx_reputation_history_reason ON reputation_history(reason);
+CREATE INDEX idx_reputation_history_entity ON reputation_history(related_entity_type, related_entity_id);
 
 -- NOTIFICATION TABLE INDEXES
 CREATE INDEX IF NOT EXISTS idx_notification_recipient ON notification(recipient_user_id, created_at DESC);
