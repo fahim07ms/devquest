@@ -1,7 +1,8 @@
-const router = require('express').Router();
+import express from 'express';
 
-const tagController = require('../controllers/tagController');
+const router = express.Router();
+import tagController from '../controllers/tagController.js';
 
 router.get('/', tagController.getTags);
 
-module.exports = router;
+export default router;

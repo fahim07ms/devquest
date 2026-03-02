@@ -1,4 +1,4 @@
-const pool = require('../db/pool');
+import pool from '../db/pool.js';
 
 const getAllTags = async () => {
     let client = await pool.connect();
@@ -6,7 +6,6 @@ const getAllTags = async () => {
     return tags.rows;
 }
 
-
-module.exports = {
+export default {
     getAllTags
 };

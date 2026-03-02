@@ -239,7 +239,7 @@ CREATE TABLE IF NOT EXISTS "question_duplicate" (
 );
 
 -- USER_TAG_FOLLOW (M:N Relationship)
-CREATE TABLE "user_tag_follow" (
+CREATE TABLE IF NOT EXISTS "user_tag_follow" (
     user_id UUID NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
     tag_id UUID NOT NULL REFERENCES tag(tag_id) ON DELETE CASCADE,
     followed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -249,7 +249,7 @@ CREATE TABLE "user_tag_follow" (
 );
 
 -- Vote Table
-CREATE TABLE "vote" (
+CREATE TABLE IF NOT EXISTS "vote" (
     vote_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
     content_id UUID NOT NULL REFERENCES content(content_id) ON DELETE CASCADE,
@@ -262,7 +262,7 @@ CREATE TABLE "vote" (
 );
 
 -- Bookmark Table (M:N Relationship)
-CREATE TABLE "bookmark" (
+CREATE TABLE IF NOT EXISTS "bookmark" (
     user_id UUID NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
     content_id UUID NOT NULL REFERENCES content(content_id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -272,7 +272,7 @@ CREATE TABLE "bookmark" (
 );
 
 -- Flag Table
-CREATE TABLE "flag" (
+CREATE TABLE IF NOT EXISTS "flag" (
     flag_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES "user"(user_id) ON DELETE SET NULL,
     content_id UUID NOT NULL REFERENCES content(content_id) ON DELETE CASCADE,
@@ -294,7 +294,7 @@ CREATE TABLE "flag" (
 );
 
 -- BOUNTY TABLE
-CREATE TABLE "bounty" (
+CREATE TABLE IF NOT EXISTS "bounty" (
         bounty_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         question_id UUID NOT NULL REFERENCES question(content_id) ON DELETE CASCADE,
         offered_by UUID REFERENCES "user"(user_id) ON DELETE SET NULL,
@@ -316,7 +316,7 @@ CREATE TABLE "bounty" (
 );
 
 -- BADGE TABLE
-CREATE TABLE "badge" (
+CREATE TABLE IF NOT EXISTS "badge" (
     badge_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(100) NOT NULL UNIQUE,
     description TEXT NOT NULL,
@@ -331,7 +331,7 @@ CREATE TABLE "badge" (
 );
 
 -- BADGE_AWARD (M:N Relationship)
-CREATE TABLE "badge_award" (
+CREATE TABLE IF NOT EXISTS "badge_award" (
     award_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
     badge_id UUID NOT NULL REFERENCES badge(badge_id) ON DELETE CASCADE,
@@ -342,7 +342,7 @@ CREATE TABLE "badge_award" (
 );
 
 -- REPUTATION_HISTORY TABLE
-CREATE TABLE "reputation_history" (
+CREATE TABLE IF NOT EXISTS "reputation_history" (
     history_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
     change_amount INTEGER NOT NULL,
@@ -356,7 +356,7 @@ CREATE TABLE "reputation_history" (
 );
 
 -- NOTIFICATION TABLE
-CREATE TABLE "notification" (
+CREATE TABLE IF NOT EXISTS "notification" (
     notification_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     recipient_user_id UUID NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
     actor_user_id UUID REFERENCES "user"(user_id) ON DELETE SET NULL,
