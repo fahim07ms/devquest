@@ -1,5 +1,17 @@
 import { z } from "zod";
 
+export interface RegisterInput {
+    username: string;
+    email: string;
+    password: string;
+    confirmPassword: string;
+}
+
+export interface LoginInput {
+    username: string;
+    password: string;
+}
+
 export const registerSchema = z.object({
     username: z.string().min(1),
     email: z.email(),
