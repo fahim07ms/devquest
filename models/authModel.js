@@ -1,4 +1,5 @@
 import pool from '../db/pool.js';
+import {withTransaction} from "../db/client.js";
 
 const getUserByUsername = async (username) => {
     const query = `
@@ -39,14 +40,14 @@ const getUserById = async (id) => {
             username,
             email,
             role,
-            password_hash as passwordHash,
-            is_active as isActive,
-            reputation_points as reputationPoints,
-            badge_count as badgeCount,
-            p.first_name as firstName,
-            p.last_name as lastName,
+            password_hash as "passwordHash",
+            is_active as "isActive",
+            reputation_points as "reputationPoints",
+            badge_count as "badgeCount",
+            p.first_name as "firstName",
+            p.last_name as "lastName",
             p.bio as bio,
-            p.profile_picture as profilePicture
+            p.profile_picture as "profilePicture"
         FROM "user" u
         JOIN profile p ON u.user_id = p.user_id
         WHERE u.user_id = $1
@@ -61,18 +62,30 @@ const getUserById = async (id) => {
 }
 
 const registerUser = async (username, email, passwordHash) => {
-    const result = await pool.query(
-        'INSERT INTO "user" (username, email, password_hash) VALUES ($1, $2, $3) RETURNING *',
-        [username, email, passwordHash]
-    );
-    
-    // Create a profile for the user
-    const profile = await pool.query(
-        'INSERT INTO profile (user_id) VALUES ($1)',
-        [result.rows[0]["user_id"]]
-    );
-    
-    return result.rows[0] || null;
+    try {
+        const result = await withTransaction(async (client) => {
+            // Create the user
+            const userResult = await client.query(
+                `INSERT INTO "user" (username, email, password_hash)
+                VALUES ($1, $2, $3)
+                RETURNING user_id as id, username, email, role`,
+                [username, email, passwordHash]
+            );
+            
+            // Create a profile for the user
+            await client.query(
+                'INSERT INTO profile (user_id) VALUES ($1)',
+                [userResult.rows[0]["id"]]
+            );
+            
+            return userResult;
+        });
+        
+        return result.rows[0] || null;
+        
+    } catch (error) {
+        throw error;
+    }
 }
 
 export default {

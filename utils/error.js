@@ -1,5 +1,6 @@
-export const sendErrorResponse = (res, statusCode, message) => {
+export const sendErrorResponse = (res, statusCode, message, errors) => {
     return res.status(statusCode).json({
-        message: message
+        message: message,
+        ...(errors && { errors })
     })
 }

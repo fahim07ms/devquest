@@ -39,76 +39,43 @@ export const register = async (req, res) => {
     const {
         username,
         email,
-        password,
-        confirmPassword
+        password
     } = req.body;
     
-    if (!username || !email || !password || !confirmPassword) {
-        return sendErrorResponse(
-            res,
-            400,
-            "All fields are required."
-        );
-    }
-    
-    if (username.length < 1) {
-        return sendErrorResponse(
-            res,
-            400,
-            "Username must be at least 1 character long."
-        );
-    }
-    
-    if (password.length < 8) {
-        return sendErrorResponse(
-            res,
-            400,
-            "Password must be at least 8 characters long."
-        );
-    }
-    
-    // Check if the user confirmed the password properly
-    if (password !== confirmPassword) {
-        return sendErrorResponse(
-            res,
-            401,
-            "Password don't match."
-        );
-    }
-    
-    // Hash the password
-    const passwordHash = await bcrypt.hash(password, 12);
-    
     try {
-        // Check if the username already exists
-        const existingUser = await authModel.getUserByUsername(username);
-        
-        if (existingUser) {
-            return sendErrorResponse(
-                res,
-                409,
-                "Username already exists."
-            );
-        }
-        
-        // Check if the email already exists
-        const existingEmail = await authModel.getUserByEmail(email);
-        if (existingEmail) {
-            return sendErrorResponse(
-                res,
-                409,
-                "Email already exists."
-            );
-        }
+        // Hash the password
+        const passwordHash = await bcrypt.hash(password, 12);
         
         // Create the user
         const user = await authModel.registerUser(username, email, passwordHash);
+        
+        if (!user) {
+            return sendErrorResponse(
+                res,
+                424,
+                'Failed to create user.'
+            )
+        }
         
         return res.status(201).json({
             message: "User created successfully."
         });
     } catch (e) {
         if (process.env.NODE_ENV === 'development') console.log(e);
+        
+        if (e.code === '23505') {
+            let message = 'User already exists.';
+            
+            if (e.detail.includes('username')) message = 'Username already exists.';
+            if (e.detail.includes('email')) message = 'Email already exists.';
+            
+            return sendErrorResponse(
+                res,
+                400,
+                message
+            );
+        }
+        
         return sendErrorResponse(
             res,
             500,
@@ -119,15 +86,6 @@ export const register = async (req, res) => {
 
 export const login = async (req, res) => {
     const {username, password} = req.body;
-    
-    // Check if the username and password are provided
-    if (!username || !password) {
-        return sendErrorResponse(
-            res,
-            400,
-            "All fields are required."
-        );
-    }
     
     try {
         // Check if the user exists
@@ -160,6 +118,7 @@ export const login = async (req, res) => {
             data: {
                 user: {
                     id: user.id,
+                    username: user.username,
                     role: user.role,
                 }
             },
