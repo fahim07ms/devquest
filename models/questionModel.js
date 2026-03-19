@@ -4,10 +4,11 @@ import pool from "../db/pool.js";
 // Get all questions with pagination, sorting, filtering and search
 const getQuestions = async (limit, offset, sortBy, sortOrder, filters, search) => {
     try {
-        // TODO: Implement filters
+        // TODO: Implement tag filters
         
         const query = `
             SELECT
+                c.content_id as "id",
                 q.title,
                 c.body,
                 q.view_count as "viewCount",
@@ -20,11 +21,20 @@ const getQuestions = async (limit, offset, sortBy, sortOrder, filters, search) =
                     'firstName', p.first_name,
                     'lastName', p.last_name,
                     'profilePicture', p.profile_picture
-                ) as "author"
+                ) as "author",
+                COALESCE(
+                    jsonb_agg(
+                        jsonb_build_object('id', t.tag_id, 'name', t.name)
+                    ) FILTER (WHERE t.tag_id IS NOT NULL),
+                    '[]'::jsonb
+                ) as "tags"
             FROM question q
             JOIN content c ON q.content_id = c.content_id
             JOIN profile p ON c.author_id = p.user_id
+            LEFT JOIN question_tag qt ON qt.question_id = q.content_id
+            LEFT JOIN tag t ON t.tag_id = qt.tag_id
             WHERE LOWER(q.title) LIKE LOWER('%' || $1 || '%')
+            GROUP BY c.content_id, q.content_id, p.user_id
             ORDER BY ${sortBy} ${sortOrder}
             LIMIT $2 OFFSET $3
         `;
