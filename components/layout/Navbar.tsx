@@ -16,6 +16,7 @@ export function Navbar() {
     const { theme, setTheme } = useTheme()
     const searchParams = useSearchParams()
     const [search, setSearch] = useState(searchParams.get('search') || '')
+    const [focused, setFocused] = useState(false)
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault()
@@ -25,36 +26,47 @@ export function Navbar() {
     }
 
     return (
-        <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border bg-background/80 backdrop-blur-sm px-4">
+        <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border/50 bg-background/80 backdrop-blur-md px-4">
             {/* Sidebar toggle */}
-            <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+            <SidebarTrigger className="text-muted-foreground hover:text-foreground transition-colors -ml-1" />
 
-            {/* Search bar */}
-            <form onSubmit={handleSearch} className="flex-1 max-w-lg">
+            {/* Thin divider */}
+            <div className="h-5 w-px bg-border/60" />
+
+            {/* Search */}
+            <form onSubmit={handleSearch} className="flex-1 max-w-md">
                 <div className="relative">
-                    <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <MagnifyingGlass
+                        className={`absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 transition-colors duration-150 ${
+                            focused ? 'text-primary' : 'text-muted-foreground'
+                        }`}
+                    />
                     <Input
-                        id="navbar-search"
                         type="search"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
+                        onFocus={() => setFocused(true)}
+                        onBlur={() => setFocused(false)}
                         placeholder="Search questions…"
-                        className="pl-9 h-9 bg-muted/50 border-transparent focus:border-primary focus:bg-background transition-all"
+                        className={`pl-8 h-8 text-sm bg-muted/40 border transition-all duration-200 ${
+                            focused
+                                ? 'border-primary/50 bg-background ring-2 ring-primary/10'
+                                : 'border-transparent hover:border-border'
+                        }`}
                     />
                 </div>
             </form>
 
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-1.5">
                 {/* Ask Question */}
                 {isAuthenticated && (
                     <Button
                         asChild
                         size="sm"
-                        className="gap-1.5 hidden sm:flex"
-                        id="ask-question-btn"
+                        className="h-8 gap-1.5 hidden sm:flex text-xs px-3 shadow-none"
                     >
                         <Link href="/questions/ask">
-                            <PencilSimple className="h-3.5 w-3.5" />
+                            <PencilSimple weight="bold" className="h-3 w-3" />
                             Ask Question
                         </Link>
                     </Button>
@@ -63,14 +75,13 @@ export function Navbar() {
                 {/* Theme toggle */}
                 <button
                     onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                    className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                    className="h-8 w-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-150"
                     title="Toggle theme"
-                    id="theme-toggle-btn"
                 >
                     {theme === 'dark' ? (
-                        <Sun className="h-4 w-4" />
+                        <Sun className="h-3.5 w-3.5" />
                     ) : (
-                        <Moon className="h-4 w-4" />
+                        <Moon className="h-3.5 w-3.5" />
                     )}
                 </button>
             </div>

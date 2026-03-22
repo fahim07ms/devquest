@@ -1,7 +1,7 @@
 // Shared TypeScript types for DevQuest
 
 export interface Tag {
-    id: string;
+    tag_id: string;
     name: string;
 }
 

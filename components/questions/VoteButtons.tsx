@@ -23,13 +23,11 @@ export function VoteButtons({ score, contentId: _contentId, orientation = 'verti
             toast.error('You must be logged in to vote.')
             return
         }
-        // Coming soon – vote API route not built yet
         if (userVote === value) {
-            // Cancel vote
             setCurrentScore((s) => s - value)
             setUserVote(0)
         } else {
-            const delta = value - userVote // handles switching vote
+            const delta = value - userVote
             setCurrentScore((s) => s + delta)
             setUserVote(value)
         }
@@ -39,51 +37,57 @@ export function VoteButtons({ score, contentId: _contentId, orientation = 'verti
     return (
         <div
             className={cn(
-                'flex items-center gap-1',
+                'flex items-center gap-0.5',
                 orientation === 'vertical' ? 'flex-col' : 'flex-row',
                 className
             )}
         >
+            {/* Upvote */}
             <button
                 type="button"
-                id={`upvote-${_contentId}`}
                 onClick={() => handleVote(1)}
-                className={cn(
-                    'p-1.5 rounded-lg transition-all',
-                    userVote === 1
-                        ? 'text-primary bg-primary/15'
-                        : 'text-muted-foreground hover:text-primary hover:bg-primary/10'
-                )}
                 title="Upvote"
+                className={cn(
+                    'p-1.5 rounded-lg transition-all duration-150',
+                    userVote === 1
+                        ? 'text-primary bg-primary/12'
+                        : 'text-muted-foreground/50 hover:text-primary hover:bg-primary/10'
+                )}
             >
-                <ArrowFatUp weight={userVote === 1 ? 'fill' : 'regular'} className="h-5 w-5" />
+                <ArrowFatUp
+                    weight={userVote === 1 ? 'fill' : 'regular'}
+                    className="h-4 w-4"
+                />
             </button>
 
+            {/* Score */}
             <span
                 className={cn(
-                    'font-bold tabular-nums min-w-[2rem] text-center',
-                    'text-base',
+                    'font-bold tabular-nums text-sm min-w-[1.75rem] text-center leading-none py-0.5',
                     currentScore > 0 && 'text-primary',
                     currentScore < 0 && 'text-destructive',
-                    currentScore === 0 && 'text-muted-foreground'
+                    currentScore === 0 && 'text-muted-foreground/60'
                 )}
             >
                 {currentScore}
             </span>
 
+            {/* Downvote */}
             <button
                 type="button"
-                id={`downvote-${_contentId}`}
                 onClick={() => handleVote(-1)}
-                className={cn(
-                    'p-1.5 rounded-lg transition-all',
-                    userVote === -1
-                        ? 'text-destructive bg-destructive/15'
-                        : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'
-                )}
                 title="Downvote"
+                className={cn(
+                    'p-1.5 rounded-lg transition-all duration-150',
+                    userVote === -1
+                        ? 'text-destructive bg-destructive/12'
+                        : 'text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10'
+                )}
             >
-                <ArrowFatDown weight={userVote === -1 ? 'fill' : 'regular'} className="h-5 w-5" />
+                <ArrowFatDown
+                    weight={userVote === -1 ? 'fill' : 'regular'}
+                    className="h-4 w-4"
+                />
             </button>
         </div>
     )

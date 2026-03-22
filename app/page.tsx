@@ -1,106 +1,264 @@
-import { Inter } from 'next/font/google'
+"use client"
+
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Star, Code, Users, Lightning, CaretRight } from '@phosphor-icons/react/dist/ssr'
-
-const inter = Inter({ subsets: ['latin'] })
+import { useRef } from 'react'
+import {Navbar} from "@/components/landing/Navbar";
 
 export default function LandingPage() {
-    return (
-        <div className={`min-h-screen bg-background flex flex-col ${inter.className}`}>
-            {/* Minimal Public Navbar */}
-            <header className="flex h-16 items-center justify-between px-6 border-b border-border/40 backdrop-blur-md sticky top-0 z-50">
-                <div className="flex items-center gap-2 group">
-                    <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-                        <Star weight="fill" className="h-4 w-4 text-primary-foreground" />
-                    </div>
-                    <span className="text-xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
-                        DevQuest
-                    </span>
-                </div>
-                <div className="flex items-center gap-4">
-                    <Link href="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                        Sign In
-                    </Link>
-                    <Button asChild>
-                        <Link href="/register">Join Now</Link>
-                    </Button>
-                </div>
-            </header>
+    const heroRef = useRef<HTMLDivElement>(null)
 
-            <main className="flex-1 flex flex-col items-center">
-                {/* Hero Section */}
-                <section className="w-full relative overflow-hidden py-24 sm:py-32 px-6 lg:px-8 mt-12 bg-card/10">
-                    {/* Background glow effects */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/20 rounded-full blur-[120px] -z-10" />
-                    
-                    <div className="mx-auto max-w-4xl text-center items-center flex flex-col relative z-10">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-8 border border-primary/20">
-                            <Star weight="fill" className="h-3.5 w-3.5" />
-                            <span>The New Standard for Developer Q&A</span>
-                        </div>
-                        
-                        <h1 className="text-5xl sm:text-7xl font-extrabold tracking-tight text-foreground mb-6 leading-[1.1]">
-                            Solve hard problems, <br className="hidden sm:block" />
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-primary/60">
+    return (
+        <div className="min-h-screen bg-background text-foreground flex flex-col overflow-x-hidden" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+
+            <main className="flex-1 flex flex-col">
+
+                <Navbar />
+
+                {/* ── Hero ── */}
+                <section
+                    ref={heroRef}
+                    className="relative min-h-screen flex flex-col justify-center px-6 pt-24 pb-16"
+                    style={{ '--delay': '0ms' } as React.CSSProperties}
+                >
+                    {/* Grid texture */}
+                    <div
+                        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.025] dark:opacity-[0.04]"
+                        style={{
+                            backgroundImage: `
+                                linear-gradient(var(--foreground) 1px, transparent 1px),
+                                linear-gradient(90deg, var(--foreground) 1px, transparent 1px)
+                            `,
+                            backgroundSize: '48px 48px',
+                        }}
+                    />
+
+                    {/* Ambient glow */}
+                    <div
+                        className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 rounded-full"
+                        style={{
+                            width: '720px',
+                            height: '480px',
+                            background: 'radial-gradient(ellipse, color-mix(in oklch, var(--primary) 18%, transparent) 0%, transparent 70%)',
+                            filter: 'blur(40px)',
+                        }}
+                    />
+
+                    <div className="mx-auto max-w-5xl w-full">
+
+                        {/* Eyebrow */}
+                        <p
+                            className="text-xs font-medium tracking-[0.2em] uppercase text-primary mb-8 opacity-0 animate-fade-up"
+                            style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}
+                        >
+                            Developer Q&amp;A — Reimagined
+                        </p>
+
+                        {/* Headline */}
+                        <h1
+                            className="font-bold text-foreground opacity-0 animate-fade-up mb-6"
+                            style={{
+                                fontSize: 'clamp(2.8rem, 8vw, 6.5rem)',
+                                lineHeight: '1.03',
+                                letterSpacing: '-0.04em',
+                                animationDelay: '200ms',
+                                animationFillMode: 'forwards',
+                            }}
+                        >
+                            Solve hard<br />
+                            problems,{' '}
+                            <span
+                                style={{
+                                    background: 'linear-gradient(135deg, var(--primary) 0%, color-mix(in oklch, var(--primary) 55%, var(--foreground)) 100%)',
+                                    WebkitBackgroundClip: 'text',
+                                    WebkitTextFillColor: 'transparent',
+                                }}
+                            >
                                 together.
                             </span>
                         </h1>
-                        
-                        <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mb-10 leading-relaxed font-mono">
-                            DevQuest is a modern community platform built by developers, for developers. Find answers, share knowledge, and build your reputation.
+
+                        {/* Subtext */}
+                        <p
+                            className="text-base sm:text-lg text-muted-foreground max-w-xl leading-relaxed mb-10 opacity-0 animate-fade-up"
+                            style={{ animationDelay: '350ms', animationFillMode: 'forwards' }}
+                        >
+                            A community platform built by developers, for developers. Find answers, share knowledge, and grow your reputation — without the noise.
                         </p>
-                        
-                        <div className="flex flex-col sm:flex-row items-center gap-4">
-                            <Button size="lg" className="h-12 px-8 text-base shadow-lg shadow-primary/25 group w-full sm:w-auto" asChild>
-                                <Link href="/register">
-                                    Start Exploring
-                                    <CaretRight weight="bold" className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                                </Link>
+
+                        {/* CTA row */}
+                        <div
+                            className="flex flex-wrap gap-3 items-center opacity-0 animate-fade-up"
+                            style={{ animationDelay: '480ms', animationFillMode: 'forwards' }}
+                        >
+                            <Button
+                                asChild
+                                size="lg"
+                                className="h-11 px-7 text-sm font-medium shadow-none"
+                            >
+                                <Link href="/register">Start Exploring</Link>
                             </Button>
-                            <Button size="lg" variant="outline" className="h-12 px-8 text-base w-full sm:w-auto" asChild>
-                                <Link href="/questions">Current Questions</Link>
+                            <Button
+                                asChild
+                                size="lg"
+                                variant="ghost"
+                                className="h-11 px-7 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground"
+                            >
+                                <Link href="/questions">Browse Questions →</Link>
                             </Button>
+                        </div>
+
+                        {/*/!* Social proof micro-line *!/*/}
+                        {/*<p*/}
+                        {/*    className="mt-10 text-xs text-muted-foreground/60 opacity-0 animate-fade-up"*/}
+                        {/*    style={{ animationDelay: '600ms', animationFillMode: 'forwards' }}*/}
+                        {/*>*/}
+                        {/*    Trusted by engineers at early-stage startups to large teams.*/}
+                        {/*</p>*/}
+                    </div>
+                </section>
+
+                {/* ── Divider rule ── */}
+                <div className="mx-auto max-w-6xl px-6 w-full">
+                    <div className="h-px bg-border/60" />
+                </div>
+
+                {/* ── Features ── */}
+                <section className="py-24 px-6">
+                    <div className="mx-auto max-w-6xl">
+
+                        {/* Section label */}
+                        <p className="text-xs font-medium tracking-[0.2em] uppercase text-muted-foreground mb-12">
+                            What you get
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-border/50 rounded-2xl overflow-hidden border border-border/50">
+
+                            {[
+                                {
+                                    number: '01',
+                                    title: 'Code-First Discussions',
+                                    body: 'Ask questions the way developers actually think — in code. Paste a snippet, describe the problem, get a real answer.',
+                                },
+                                {
+                                    number: '02',
+                                    title: 'Instant Answers',
+                                    body: 'A clean, focused interface that puts content first. No distractions — just the code and context you need to move forward.',
+                                },
+                                {
+                                    number: '03',
+                                    title: 'Community Driven',
+                                    body: 'Earn reputation points, unlock badges, and help keep the community clean. Built by people who care about quality.',
+                                },
+                            ].map((f) => (
+                                <div
+                                    key={f.number}
+                                    className="bg-card p-8 lg:p-10 group hover:bg-accent/30 transition-colors duration-300"
+                                >
+                                    <span className="text-xs font-medium tracking-widest text-primary/70 mb-6 block">
+                                        {f.number}
+                                    </span>
+                                    <h3
+                                        className="text-lg font-bold mb-3 text-foreground group-hover:text-primary transition-colors duration-300"
+                                        style={{ letterSpacing: '-0.02em' }}
+                                    >
+                                        {f.title}
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
+                                        {f.body}
+                                    </p>
+                                </div>
+                            ))}
+
                         </div>
                     </div>
                 </section>
 
-                {/* Features Section */}
-                <section className="w-full py-24 bg-muted/20 border-y border-border/40">
-                    <div className="mx-auto max-w-7xl px-6 lg:px-8">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            <div className="bg-card p-8 rounded-2xl border border-border shadow-sm hover:shadow-md transition-shadow">
-                                <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
-                                    <Code weight="duotone" className="h-6 w-6 text-primary" />
-                                </div>
-                                <h3 className="text-xl font-bold mb-3">Modern Editor</h3>
-                                <p className="text-muted-foreground">Rich-text markdown editor powered by TipTap with syntax highlighting for maximum clarity.</p>
-                            </div>
-                            
-                            <div className="bg-card p-8 rounded-2xl border border-border shadow-sm hover:shadow-md transition-shadow">
-                                <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
-                                    <Lightning weight="duotone" className="h-6 w-6 text-primary" />
-                                </div>
-                                <h3 className="text-xl font-bold mb-3">Instant Answers</h3>
-                                <p className="text-muted-foreground">Find the exact code you need instantly. A streamlined interface that puts content first, not clutter.</p>
-                            </div>
-                            
-                            <div className="bg-card p-8 rounded-2xl border border-border shadow-sm hover:shadow-md transition-shadow">
-                                <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
-                                    <Users weight="duotone" className="h-6 w-6 text-primary" />
-                                </div>
-                                <h3 className="text-xl font-bold mb-3">Community Driven</h3>
-                                <p className="text-muted-foreground">Earn reputation points, unlock badges, and help moderate the community. Built collectively.</p>
+                {/* ── CTA Banner ── */}
+                <section className="py-24 px-6">
+                    <div className="mx-auto max-w-6xl">
+                        <div
+                            className="rounded-2xl border border-primary/20 px-10 py-16 relative overflow-hidden text-center"
+                            style={{
+                                background: 'color-mix(in oklch, var(--primary) 6%, var(--card))',
+                            }}
+                        >
+                            {/* Inner glow */}
+                            <div
+                                className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 -z-0 rounded-full"
+                                style={{
+                                    width: '500px',
+                                    height: '200px',
+                                    background: 'radial-gradient(ellipse, color-mix(in oklch, var(--primary) 22%, transparent) 0%, transparent 70%)',
+                                    filter: 'blur(40px)',
+                                }}
+                            />
+                            <div className="relative z-10">
+                                <p className="text-xs font-medium tracking-[0.2em] uppercase text-primary mb-4">
+                                    Ready to start?
+                                </p>
+                                <h2
+                                    className="font-bold text-foreground mb-4"
+                                    style={{
+                                        fontSize: 'clamp(1.8rem, 4vw, 3rem)',
+                                        letterSpacing: '-0.03em',
+                                        lineHeight: '1.1',
+                                    }}
+                                >
+                                    Join the conversation.
+                                </h2>
+                                <p className="text-sm text-muted-foreground mb-8 max-w-md mx-auto leading-relaxed">
+                                    Create a free account and start asking, answering, and building your reputation in minutes.
+                                </p>
+                                <Button asChild size="lg" className="h-11 px-8 text-sm font-medium rounded-md shadow-none">
+                                    <Link href="/register">Create Free Account</Link>
+                                </Button>
                             </div>
                         </div>
                     </div>
                 </section>
+
             </main>
-            
-            {/* Footer */}
-            <footer className="py-8 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
-               <Star weight="fill" className="h-3 w-3" /> DevQuest 2026. Built for developers.
+
+            {/* ── Footer ── */}
+            <footer className="border-t border-border/40 py-8 px-6">
+                <div className="mx-auto max-w-6xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <span className="text-sm font-bold tracking-tighter text-muted-foreground" style={{ letterSpacing: '-0.03em' }}>
+                        dev<span className="text-primary">quest</span><span className="text-primary">.</span>
+                    </span>
+                    <p className="text-xs text-muted-foreground/60">
+                        © 2026 DevQuest. Built for developers.
+                    </p>
+                    <div className="flex gap-5">
+                        {['About', 'Privacy', 'Terms'].map((item) => (
+                            <Link
+                                key={item}
+                                href={`/${item.toLowerCase()}`}
+                                className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                            >
+                                {item}
+                            </Link>
+                        ))}
+                    </div>
+                </div>
             </footer>
+
+            {/* ── Animation styles ── */}
+            <style jsx global>{`
+                @keyframes fade-up {
+                    from {
+                        opacity: 0;
+                        transform: translateY(20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+                .animate-fade-up {
+                    animation: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+                }
+            `}</style>
         </div>
     )
 }

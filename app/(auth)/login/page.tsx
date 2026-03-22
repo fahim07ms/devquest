@@ -28,6 +28,7 @@ import {
     FieldLabel,
 } from "@/components/ui/field";
 import {Loader} from "lucide-react";
+import {Navbar} from "@/components/landing/Navbar";
 
 
 function SignInPage() {
@@ -65,70 +66,74 @@ function SignInPage() {
 
 
     return (
-        <div className={"flex justify-center items-center h-screen"}>
-            <Card className="w-full max-w-sm">
-                <CardHeader>
-                    <CardTitle className={"text-center text-2xl"}>Login to your account</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <form id={"login-form"} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <FieldGroup>
-                            {/* Username field */}
-                            <Controller
-                                name={"username"}
-                                control={form.control}
-                                render={({ field, fieldState }) => (
-                                    <Field data-invalid={fieldState.invalid}>
-                                        <FieldLabel htmlFor={"login-form-username"}>Username</FieldLabel>
-                                        <Input
-                                            {...field}
-                                            id={"login-form-username"}
-                                            placeholder="Enter your username"
-                                            aria-invalid={fieldState.invalid}
-                                            disabled={isLoading}
-                                        />
-                                        {fieldState.error && (
-                                            <FieldError errors={[fieldState.error]} />
-                                        )}
-                                    </Field>
-                                )}
-                            />
+        <div className="min-h-screen bg-background text-foreground flex flex-col overflow-x-hidden">
+            <Navbar />
 
-                            {/* Password field */}
-                            <Controller
-                                name={"password"}
-                                control={form.control}
-                                render={({ field, fieldState }) => (
-                                    <Field data-invalid={fieldState.invalid}>
-                                        <FieldLabel htmlFor={"login-form-password"}>Password</FieldLabel>
-                                        <Input
-                                            {...field}
-                                            id={"login-form-password"}
-                                            type="password"
-                                            placeholder="Enter your password"
-                                            aria-invalid={fieldState.invalid}
-                                            disabled={isLoading}
-                                        />
-                                        {fieldState.error && (
-                                            <FieldError errors={[fieldState.error]} />
-                                        )}
-                                    </Field>
-                                )}
-                            />
-                        </FieldGroup>
+            <div className={"flex justify-center items-center h-screen"}>
+                <Card className="w-full max-w-sm">
+                    <CardHeader>
+                        <CardTitle className={"text-center text-2xl"}>Login to your account</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <form id={"login-form"} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                            <FieldGroup>
+                                {/* Username field */}
+                                <Controller
+                                    name={"username"}
+                                    control={form.control}
+                                    render={({ field, fieldState }) => (
+                                        <Field data-invalid={fieldState.invalid}>
+                                            <FieldLabel htmlFor={"login-form-username"}>Username</FieldLabel>
+                                            <Input
+                                                {...field}
+                                                id={"login-form-username"}
+                                                placeholder="Enter your username"
+                                                aria-invalid={fieldState.invalid}
+                                                disabled={isLoading}
+                                            />
+                                            {fieldState.error && (
+                                                <FieldError errors={[fieldState.error]} />
+                                            )}
+                                        </Field>
+                                    )}
+                                />
 
-                        {/* Submit button */}
-                        <Button type="submit" className="w-full" disabled={isLoading}>
-                            {isLoading ? <Loader className="animate-spin" /> : "Sign In"}
-                        </Button>
-                    </form>
-                </CardContent>
-                <CardFooter className="flex-col gap-2">
-                    <p>
-                        Don&#39;t have an account? <a href="/register" className="text-primary hover:underline">Create one</a>
-                    </p>
-                </CardFooter>
-            </Card>
+                                {/* Password field */}
+                                <Controller
+                                    name={"password"}
+                                    control={form.control}
+                                    render={({ field, fieldState }) => (
+                                        <Field data-invalid={fieldState.invalid}>
+                                            <FieldLabel htmlFor={"login-form-password"}>Password</FieldLabel>
+                                            <Input
+                                                {...field}
+                                                id={"login-form-password"}
+                                                type="password"
+                                                placeholder="Enter your password"
+                                                aria-invalid={fieldState.invalid}
+                                                disabled={isLoading}
+                                            />
+                                            {fieldState.error && (
+                                                <FieldError errors={[fieldState.error]} />
+                                            )}
+                                        </Field>
+                                    )}
+                                />
+                            </FieldGroup>
+
+                            {/* Submit button */}
+                            <Button type="submit" className="w-full" disabled={isLoading}>
+                                {isLoading ? <Loader className="animate-spin" /> : "Sign In"}
+                            </Button>
+                        </form>
+                    </CardContent>
+                    <CardFooter className="flex-col gap-2">
+                        <p>
+                            Don&#39;t have an account? <a href="/register" className="text-primary hover:underline">Create one</a>
+                        </p>
+                    </CardFooter>
+                </Card>
+            </div>
         </div>
     )
 }

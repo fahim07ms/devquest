@@ -1,9 +1,9 @@
 // API service layer for questions, answers, and comments
 
 import api from "@/lib/api";
-import type { Question, Answer, Comment } from "@/types";
+import type {Question, Answer, Comment, Tag} from "@/types";
 
-// ─── Question Services ──────────────────────────────────────────────────────
+// Questions
 
 export interface GetQuestionsParams {
     page?: number;
@@ -16,10 +16,10 @@ export interface GetQuestionsParams {
 
 export const getQuestions = async (params: GetQuestionsParams = {}) => {
     const response = await api.get<{ data: { questions: Question[] }; message: string }>(
-        "/questions",
-        { params }
+        "/questions"
     );
-    return response.data.data.questions;
+    console.log(response);
+    return response;
 };
 
 export const getQuestionById = async (questionId: string) => {
@@ -29,7 +29,7 @@ export const getQuestionById = async (questionId: string) => {
     return response.data.data.question;
 };
 
-export const createQuestion = async (data: { title: string; body: object; tags?: string[] }) => {
+export const createQuestion = async (data: { title: string; body: object; tags?: Tag[] }) => {
     const response = await api.post<{ data: { question: Question }; message: string }>(
         "/questions",
         data

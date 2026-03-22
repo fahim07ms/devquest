@@ -12,7 +12,7 @@ interface AnswerCardProps {
     answer: Answer
     isQuestionAuthor?: boolean
     onAccept?: (answerId: string) => void
-    children?: React.ReactNode // Comment thread slots here
+    children?: React.ReactNode
     className?: string
 }
 
@@ -20,44 +20,67 @@ export function AnswerCard({ answer, isQuestionAuthor, onAccept, children, class
     const timeAgo = formatDistanceToNow(new Date(answer.createdAt), { addSuffix: true })
 
     return (
-        <div className={cn('flex gap-4 py-6 border-b border-border/50 last:border-0', className)}>
-            {/* Left: Vote buttons & Accepted state */}
-            <div className="flex flex-col items-center gap-3 w-10 flex-shrink-0">
+        <div
+            className={cn(
+                'group relative flex gap-5 py-7 border-b border-border/40 last:border-0',
+                answer.isAccepted && 'bg-emerald-500/[0.03] rounded-xl px-4 -mx-4',
+                className
+            )}
+        >
+            {/* Accepted accent bar */}
+            {answer.isAccepted && (
+                <div className="absolute left-0 top-6 bottom-6 w-0.5 bg-emerald-500/50 rounded-full" />
+            )}
+
+            {/* ── Vote column ── */}
+            <div className="flex flex-col items-center gap-2.5 w-10 flex-shrink-0 pt-0.5">
                 <VoteButtons score={answer.voteScore} contentId={answer.id} />
 
-                {answer.isAccepted && (
-                    <div title="Accepted Answer" className="text-emerald-500 bg-emerald-500/10 p-1 rounded-full">
-                        <CheckCircle weight="fill" className="h-6 w-6" />
+                {answer.isAccepted ? (
+                    <div
+                        title="Accepted answer"
+                        className="text-emerald-500 bg-emerald-500/10 p-1.5 rounded-full mt-1"
+                    >
+                        <CheckCircle weight="fill" className="h-5 w-5" />
                     </div>
-                )}
-                {!answer.isAccepted && isQuestionAuthor && onAccept && (
+                ) : isQuestionAuthor && onAccept ? (
                     <button
                         onClick={() => onAccept(answer.id)}
-                        className="text-muted-foreground hover:text-emerald-500 transition-colors p-1"
-                        title="Mark as accepted answer"
+                        title="Mark as accepted"
+                        className="text-muted-foreground/40 hover:text-emerald-500 transition-colors duration-150 p-1.5 rounded-full hover:bg-emerald-500/10 mt-1"
                     >
-                        <CheckCircle className="h-6 w-6" />
+                        <CheckCircle className="h-5 w-5" />
                     </button>
-                )}
+                ) : null}
             </div>
 
-            {/* Right: Answer body, author, comments */}
+            {/* ── Body ── */}
             <div className="flex-1 min-w-0">
-                <div className="text-foreground/90 mb-6">
+                {/* Answer content */}
+                <div className="text-foreground/90 text-sm leading-relaxed mb-6">
                     <TiptapContent content={answer.body} />
                 </div>
 
-                <div className="flex justify-between items-center flex-wrap gap-4 mb-4">
-                    <div className="flex-1" />
-                    {/* Author Signature */}
-                    <div className="bg-muted/40 rounded-lg p-3 min-w-[200px]">
-                        <div className="text-xs text-muted-foreground mb-1.5">answered {timeAgo}</div>
+                {/* Author row */}
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        {/* placeholder for edit/share actions if needed */}
+                    </div>
+
+                    <div className="flex items-center gap-2.5 bg-muted/30 border border-border/40 rounded-lg px-3 py-2">
+                        <div className="text-right">
+                            <p className="text-[10px] text-muted-foreground/70 leading-none mb-1">answered {timeAgo}</p>
+                        </div>
                         <UserAvatar author={answer.author} size="sm" />
                     </div>
                 </div>
 
-                {/* Render comments */}
-                {children}
+                {/* Comment thread slot */}
+                {children && (
+                    <div className="mt-5 pt-4 border-t border-border/30">
+                        {children}
+                    </div>
+                )}
             </div>
         </div>
     )

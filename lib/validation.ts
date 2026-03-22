@@ -1,17 +1,5 @@
 import { z } from "zod";
 
-export interface RegisterInput {
-    username: string;
-    email: string;
-    password: string;
-    confirmPassword: string;
-}
-
-export interface LoginInput {
-    username: string;
-    password: string;
-}
-
 export const registerSchema = z.object({
     username: z.string().min(1),
     email: z.email(),
@@ -28,7 +16,29 @@ export const registerSchema = z.object({
         }
     })
 
+export type RegisterInput = z.infer<typeof registerSchema>
+
 export const loginSchema = z.object({
     username: z.string().min(1),
     password: z.string().min(8)
 })
+
+export type LoginInput = z.infer<typeof loginSchema>
+
+export const askFormSchema = z.object({
+    title: z.string()
+        .min(5, 'Title must be at least 5 characters.')
+        .max(300, 'Title must be at most 300 characters.'),
+    body: z.any().refine(
+        (val) => val && JSON.stringify(val) !== '{}' && val?.content?.length > 0,
+        { message: 'Description is required.' }
+    ),
+    tags: z.array(
+        z.object({
+            tag_id: z.string(),
+            name: z.string(),
+        })
+    ).max(5),
+})
+
+export type AskFormValues = z.infer<typeof askFormSchema>
