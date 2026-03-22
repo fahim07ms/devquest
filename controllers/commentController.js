@@ -1,33 +1,22 @@
 import CommentModel from '../models/commentModel.js';
 import { sendErrorResponse } from "../utils/error.js";
+import AnswerModel from "../models/answerModel.js";
+import QuestionModel from "../models/questionModel.js";
 
 // Get comments for a question or any content using parent ID
 export const getCommentsByParentId = async (req, res) => {
     const { questionId } = req.params;
     const { answerId } = req.params;
+    const { commentId } = req.params;
     
-    const parentId = answerId || questionId;
+    const parentId = answerId || questionId || commentId;
     
     try {
         const comments = await CommentModel.getCommentsByParentId(parentId);
         
         return res.status(200).json({
             data: {
-                comments: comments.map(c => ({
-                    id: c['content_id'],
-                    parentId: c['parent_id'],
-                    depthLevel: c['depth_level'],
-                    body: c['body'],
-                    voteScore: c['vote_score'],
-                    createdAt: c['created_at'],
-                    updatedAt: c['updated_at'],
-                    author: {
-                        username: c['username'],
-                        firstName: c['first_name'],
-                        lastName: c['last_name'],
-                        profilePicture: c['profile_picture'],
-                    },
-                }))
+                comments: comments,
             },
             message: 'Comments retrieved successfully.'
         });
@@ -42,18 +31,77 @@ export const getCommentsByParentId = async (req, res) => {
     }
 };
 
+// Get single comment by ID
+export const getCommentById = async (req, res) => {
+    const { commentId } = req.params;
+    
+    try {
+        const comment = await CommentModel.getCommentById(commentId);
+        
+        if (!comment) {
+            return sendErrorResponse(
+                res,
+                404,
+                'Comment not found.'
+            )
+        }
+        
+        return res.status(200).json({
+            data: {
+                comment: comment,
+            },
+            message: 'Comment retrieved successfully.'
+        })
+    } catch (error) {
+        if (process.env.NODE_ENV === 'development') console.log(error);
+        
+        return sendErrorResponse(
+            res,
+             500,
+            'Internal Server Error',
+        )
+    }
+}
 
 // Create a comment on a question
 export const createComment = async (req, res) => {
     const { questionId } = req.params;
     const { answerId } = req.params;
+    const { commentId } = req.params;
     
-    const parentId = answerId || questionId;
+    // Validate that either answerId, questionId or commentId is provided
+    let parentId = null;
+    let parentType = null;
+    if (answerId) {
+        parentId = answerId;
+        parentType = 'answer';
+    }
+    if (questionId) {
+        parentId = questionId;
+        parentType = 'question';
+    }
+    if (commentId) {
+        parentId = commentId;
+        parentType = 'comment';
+    }
     
-    const { body } = req.body;
+    const { body, recipientId } = req.body;
     
     try {
-        const comment = await CommentModel.createComment(req.userId, parentId, body);
+        let parent = null;
+        if (parentType === 'answer') { parent = await AnswerModel.getAnswerById(parentId); }
+        if (parentType === 'question') { parent = await QuestionModel.getQuestionById(parentId); }
+        if (parentType === 'comment') { parent = await CommentModel.getCommentById(parentId); }
+        
+        if (!parent) {
+            return sendErrorResponse(
+                res,
+                 404,
+                `${parentType?.toUpperCase()} not found.`
+            )
+        }
+        
+        const comment = await CommentModel.createComment(req.userId, parentId, recipientId, body);
         
         if (!comment) {
             return sendErrorResponse(
@@ -65,21 +113,7 @@ export const createComment = async (req, res) => {
         
         return res.status(201).json({
             data: {
-                comment: {
-                    id: comment['content_id'],
-                    parentId: comment['parent_id'],
-                    depthLevel: comment['depth_level'],
-                    body: comment['body'],
-                    voteScore: comment['vote_score'],
-                    createdAt: comment['created_at'],
-                    updatedAt: comment['updated_at'],
-                    author: {
-                        username: comment['username'],
-                        firstName: comment['first_name'],
-                        lastName: comment['last_name'],
-                        profilePicture: comment['profile_picture'],
-                    },
-                }
+                comment: comment
             },
             message: 'Comment created successfully.'
         })
@@ -92,11 +126,6 @@ export const createComment = async (req, res) => {
             'Internal Server Error',
         )
     }
-};
-
-// Create a comment on an answer
-export const createAnswerComment = async (req, res) => {
-    // TODO: Implement this endpoint
 };
 
 // Edit a comment
@@ -116,7 +145,7 @@ export const editComment = async (req, res) => {
             )
         }
         
-        if (comment['author_id'] !== userId) {
+        if (comment.author.authorId !== userId) {
             return sendErrorResponse(
                 res,
                  403,
@@ -136,20 +165,7 @@ export const editComment = async (req, res) => {
         
         return res.status(200).json({
             data: {
-                comment: {
-                    id: updatedComment['content_id'],
-                    parentId: updatedComment['parent_id'],
-                    depthLevel: updatedComment['depth_level'],
-                    body: updatedComment['body'],
-                    voteScore: updatedComment['vote_score'],
-                    createdAt: updatedComment['created_at'],
-                    updatedAt: updatedComment['updated_at'],
-                    author: {
-                        firstName: comment['first_name'],
-                        lastName: comment['last_name'],
-                        profilePicture: comment['profile_picture'],
-                    }
-                }
+                comment: updatedComment
             }
         })
     } catch (error) {
@@ -187,7 +203,7 @@ export const deleteComment = async (req, res) => {
             )
         }
         
-        if (comment['author_id'] !== userId) {
+        if (comment.author.authorId !== userId) {
             return sendErrorResponse(
                 res,
                    403,

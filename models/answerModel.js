@@ -4,18 +4,20 @@ import { withTransaction } from '../db/client.js';
 const getAnswersByQuestionId = async (questionId) => {
     const query = `
         SELECT
-            a.content_id,
-            a.is_accepted,
-            a.accepted_at,
+            a.content_id as id,
+            a.is_accepted as "isAccepted",
+            a.accepted_at as "acceptedAt",
             c.body,
-            c.vote_score,
-            c.created_at,
-            c.updated_at,
-            c.author_id,
-            p.first_name,
-            p.last_name,
-            p.profile_picture,
-            u.username
+            c.vote_score as "voteScore",
+            c.created_at as "createdAt",
+            c.updated_at as "updatedAt",
+            jsonb_build_object(
+                'authorId', c.author_id,
+                'username', u.username,
+                'firstName', p.first_name,
+                'lastName', p.last_name,
+                'profilePicture', p.profile_picture
+            ) as "author"
         FROM answer a
         JOIN content c ON a.content_id = c.content_id
         JOIN profile p ON c.author_id = p.user_id
@@ -38,16 +40,21 @@ const getAnswersByQuestionId = async (questionId) => {
 const getAnswerById = async (answerId) => {
     const query = `
         SELECT
-            a.*,
+            a.content_id as id,
+            a.question_id as "questionId",
+            a.is_accepted as "isAccepted",
+            a.accepted_at as "acceptedAt",
             c.body,
-            c.author_id,
-            c.vote_score,
-            c.created_at,
-            c.updated_at,
-            p.first_name,
-            p.last_name,
-            p.profile_picture,
-            u.username
+            c.vote_score as "voteScore",
+            c.created_at as "createdAt",
+            c.updated_at as "updatedAt",
+            jsonb_build_object(
+                    'authorId', c.author_id,
+                    'username', u.username,
+                    'firstName', p.first_name,
+                    'lastName', p.last_name,
+                    'profilePicture', p.profile_picture
+            ) as "author"
         FROM answer a
         JOIN content c ON a.content_id = c.content_id
         LEFT JOIN profile p ON c.author_id = p.user_id
@@ -72,14 +79,20 @@ const createAnswer = async (userId, questionId, body) => {
         
         const answerResult = await client.query(
             `INSERT INTO answer (question_id, content_id)
-            VALUES ($1, $2)`,
+            VALUES ($1, $2) RETURNING *`,
             [questionId, content.rows[0]["content_id"]]
         );
         
-        return getAnswerById(answerResult.rows[0]["content_id"]);
+        await client.query(
+            `UPDATE question SET answer_count = answer_count + 1, last_activity_at = NOW() WHERE content_id = $1`,
+            [questionId]
+        );
+        
+        return answerResult.rows[0];
     });
     
-    return result || null;
+    if (!result) return null;
+    return getAnswerById(result["content_id"]);
 };
 
 const updateAnswer = async (answerId, body, authorId) => {
@@ -107,7 +120,8 @@ const updateAnswer = async (answerId, body, authorId) => {
         return updateContent.rows[0];
     });
     
-    return result || null;
+    if (!result) return null;
+    return getAnswerById(result["content_id"]);
 };
 
 const deleteAnswer = async (answerId, userId) => {
@@ -147,10 +161,32 @@ const deleteAnswer = async (answerId, userId) => {
     return result || null;
 };
 
+const updateAnswerStatus = async (answerId, isAccepted, acceptedAt) => {
+    const result = await withTransaction(async (client) => {
+        const updateAnswer = await client.query(
+            `UPDATE answer
+            SET is_accepted = $1, accepted_at = $2
+            WHERE content_id = $3
+            RETURNING content_id, is_accepted, accepted_at`,
+            [isAccepted, acceptedAt, answerId]
+        );
+        
+        if (updateAnswer.rowCount === 0) {
+            throw new Error('NOT_FOUND');
+        }
+        
+        return updateAnswer.rows[0];
+    })
+    
+    if (!result) return null;
+    return getAnswerById(result["content_id"]);
+}
+
 export default {
     getAnswersByQuestionId,
     getAnswerById,
     createAnswer,
     updateAnswer,
     deleteAnswer,
+    updateAnswerStatus,
 };

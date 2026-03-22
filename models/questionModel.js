@@ -17,6 +17,7 @@ const getQuestions = async (limit, offset, sortBy, sortOrder, tags, search, answ
                 c.created_at as "createdAt",
                 c.updated_at as "updatedAt",
                 jsonb_build_object(
+                    'authorId', c.author_id,
                     'username', u.username,
                     'firstName', p.first_name,
                     'lastName', p.last_name,
@@ -106,15 +107,23 @@ const getQuestions = async (limit, offset, sortBy, sortOrder, tags, search, answ
 const getQuestionById = async (id) => {
     const query = `
         SELECT
-            q.*,
+            q.content_id as "id",
+            q.title,
             c.body,
-            c.author_id,
-            c.created_at,
-            c.updated_at,
-            p.first_name,
-            p.last_name,
-            p.profile_picture,
-            u.username
+            q.view_count as "viewCount",
+            q.answer_count as "answersCount",
+            q.last_activity_at as "lastActivityAt",
+            c.vote_score as "voteScore",
+            c.created_at as "createdAt",
+            c.updated_at as "updatedAt",
+            jsonb_build_object(
+                'authorId', c.author_id,
+                'username', u.username,
+                'firstName', p.first_name,
+                'lastName', p.last_name,
+                'profilePicture', p.profile_picture
+            ) as "author",
+            q.is_answered as "isAnswered"
         FROM question q
             LEFT JOIN content c ON q.content_id = c.content_id
             LEFT JOIN profile p ON c.author_id = p.user_id
@@ -216,7 +225,8 @@ const updateQuestion = async (questionId, title, body, tags, authorId) => {
         }
     })
     
-    return result || null;
+    if (!result) return null;
+    return getQuestionById(result["content_id"]);
 };
 
 // Delete question

@@ -36,9 +36,6 @@ router.post('/:questionId/comments', authMiddleware, validateBody(commentSchema)
 export default router;
 
 /**
- * // Public operations
- * GET    /api/questions/unanswered             // Get unanswered questions
- *
  * // Authenticated operations
  * POST   /api/questions/:questionId/close      // Close question (moderator)
  * POST   /api/questions/:questionId/reopen     // Reopen question (moderator)

@@ -49,7 +49,7 @@ $$
             SET vote_score = vote_score - OLD.vote_type
             WHERE content_id = OLD.content_id;
         END IF;
-        RETURN NULL;
+        RETURN NEW;
     END;
 $$ LANGUAGE plpgsql;
 
@@ -178,48 +178,50 @@ CREATE TRIGGER trg_notify_on_new_answer
     FOR EACH ROW
     EXECUTE FUNCTION notify_on_new_answer();
 
--- Trigger for notifying user on answer accepted
-CREATE OR REPLACE FUNCTION notify_on_answer_accepted()
-    RETURNS TRIGGER AS
-$$
-    DECLARE
-        v_answerer_id UUID;
-        v_questioner_id UUID;
-    BEGIN
-        IF NEW.is_accepted = true AND (OLD.is_accepted IS NULL OR OLD.is_accepted = false) THEN
-            -- Get the answerer user id
-            SELECT c.author_id INTO v_answerer_id
-            FROM answer a
-                     JOIN content c ON c.content_id = a.content_id
-            WHERE a.content_id = NEW.content_id;
+    -- Trigger for notifying user on answer accepted
+    CREATE OR REPLACE FUNCTION notify_on_answer_accepted()
+        RETURNS TRIGGER AS
+    $$
+        DECLARE
+            v_answerer_id UUID;
+            v_questioner_id UUID;
+        BEGIN
+            IF NEW.is_accepted = true AND (OLD.is_accepted IS NULL OR OLD.is_accepted = false) THEN
+                -- Get the answerer user id
+                SELECT c.author_id INTO v_answerer_id
+                FROM answer a
+                         JOIN content c ON c.content_id = a.content_id
+                WHERE a.content_id = NEW.content_id;
 
-            -- Get the questioner user id
-            SELECT c.author_id INTO v_questioner_id
-            FROM answer a
-                     JOIN content c ON c.content_id = a.question_id
-            WHERE a.content_id = NEW.content_id;
+                -- Get the questioner user id
+                SELECT c.author_id INTO v_questioner_id
+                FROM answer a
+                         JOIN content c ON c.content_id = a.question_id
+                WHERE a.content_id = NEW.content_id;
 
-            IF v_questioner_id IS NOT NULL AND v_questioner_id <> v_answerer_id THEN
-                INSERT INTO notification (
-                    recipient_user_id,
-                    actor_user_id,
-                    notification_type,
-                    related_entity_id,
-                    action_url
-                ) VALUES (
-                             v_answerer_id,
-                             v_questioner_id,
-                             'ANSWER_ACCEPTED',
-                             NEW.content_id,
-                             '/questions/' || NEW.question_id || '#answer-' || NEW.content_id
-                         );
+                IF v_questioner_id IS NOT NULL AND v_questioner_id <> v_answerer_id THEN
+                    INSERT INTO notification (
+                        recipient_user_id,
+                        actor_user_id,
+                        notification_type,
+                        related_entity_id,
+                        action_url
+                    ) VALUES (
+                                 v_answerer_id,
+                                 v_questioner_id,
+                                 'ANSWER_ACCEPTED',
+                                 NEW.content_id,
+                                 '/questions/' || NEW.question_id || '#answer-' || NEW.content_id
+                             );
+                END IF;
             END IF;
-        END IF;
-    END;
-$$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_notify_on_answer_accepted
-    AFTER UPDATE
-    ON answer
-    FOR EACH ROW
-    EXECUTE FUNCTION notify_on_answer_accepted();
+            RETURN NULL;
+        END;
+    $$ LANGUAGE plpgsql;
+
+    CREATE TRIGGER trg_notify_on_answer_accepted
+        AFTER UPDATE
+        ON answer
+        FOR EACH ROW
+        EXECUTE FUNCTION notify_on_answer_accepted();

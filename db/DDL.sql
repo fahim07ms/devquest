@@ -368,3 +368,9 @@ CREATE TABLE IF NOT EXISTS "notification" (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+
+-- Changes and Updates
+ALTER TABLE comment
+DROP COLUMN depth_level;
+ALTER TABLE comment
+ADD COLUMN recipient_id UUID REFERENCES "user"(user_id) ON DELETE SET NULL;

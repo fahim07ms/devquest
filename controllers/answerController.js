@@ -21,21 +21,7 @@ export const getAnswersByQuestionId = async (req, res) => {
         
         return res.status(200).json({
             data: {
-                answers: answers.map((a) => ({
-                    id: a['content_id'],
-                    isAccepted: a['is_accepted'],
-                    acceptedAt: a['accepted_at'],
-                    body: a['body'],
-                    voteScore: a['vote_score'],
-                    createdAt: a['created_at'],
-                    updatedAt: a['updated_at'],
-                    author: {
-                        username: a['username'],
-                        firstName: a['first_name'],
-                        lastName: a['last_name'],
-                        profilePicture: a['profile_picture'],
-                    },
-                })),
+                answers: answers,
             },
             message: 'Answers retrieved successfully.',
         });
@@ -44,6 +30,36 @@ export const getAnswersByQuestionId = async (req, res) => {
         return sendErrorResponse(res, 500, 'Internal Server Error');
     }
 };
+
+// Get a single answer by ID
+export const getAnswerById = async (req, res) => {
+    const { answerId } = req.params;
+    
+    try {
+        const answer = await AnswerModel.getAnswerById(answerId);
+        
+        if (!answer) {
+            return sendErrorResponse(
+                res,
+                404,
+                'Answer not found.'
+            )
+        }
+        
+        return res.status(200).json({
+            data: {
+                answer: answer,
+            }
+        })
+    } catch (error) {
+        if (process.env.NODE_ENV === 'development') console.log(error);
+        return sendErrorResponse(
+            res,
+             500,
+            'Internal Server Error'
+        );
+    }
+}
 
 // Create an answer for a question
 export const createAnswer = async (req, res) => {
@@ -98,7 +114,7 @@ export const editAnswer = async (req, res) => {
             return sendErrorResponse(res, 404, 'Answer not found.');
         }
         
-        if (answer['author_id'] !== userId) {
+        if (answer.author.authorId !== userId) {
             return sendErrorResponse(res, 403, 'You are not authorized to edit this answer.');
         }
         
@@ -110,18 +126,7 @@ export const editAnswer = async (req, res) => {
         
         return res.status(200).json({
             data: {
-                answer: {
-                    id: updatedAnswer['content_id'],
-                    body: updatedAnswer['body'],
-                    voteScore: updatedAnswer['vote_score'],
-                    createdAt: updatedAnswer['created_at'],
-                    updatedAt: updatedAnswer['updated_at'],
-                    author: {
-                        firstName: answer['first_name'],
-                        lastName: answer['last_name'],
-                        profilePicture: answer['profile_picture'],
-                    },
-                },
+                answer: updatedAnswer,
             },
             message: 'Answer updated successfully.',
         });
@@ -129,7 +134,7 @@ export const editAnswer = async (req, res) => {
         if (process.env.NODE_ENV === 'development') console.log(error);
         
         if (error.message === 'UNAUTHORIZED_OR_NOT_FOUND') {
-            return sendErrorResponse(res, 403, 'You are not authorized to edit this answer.');
+            return sendErrorResponse(res, 403, 'You are not authorized to edit this answer or answer not found.');
         }
         
         return sendErrorResponse(
@@ -156,7 +161,7 @@ export const deleteAnswer = async (req, res) => {
             );
         }
         
-        if (answer['author_id'] !== userId) {
+        if (answer.author.authorId !== userId) {
             return sendErrorResponse(
                 res,
                 403,
@@ -201,5 +206,42 @@ export const deleteAnswer = async (req, res) => {
             500,
             'Internal Server Error'
         );
+    }
+};
+
+// Update answer acceptance status
+export const editAnswerAcceptanceStatus = async (req, res) => {
+    const { answerId } = req.params;
+    const userId = req.userId;
+    const { accepted } = req.body;
+    
+    if (accepted !== true && accepted !== false) {
+        return sendErrorResponse(res, 400, 'Invalid accepted value. Must be true or false.');
+    }
+    
+    try {
+        const answer = await AnswerModel.getAnswerById(answerId);
+        if (!answer) return sendErrorResponse(res, 404, 'Answer not found.');
+        
+        // Fetch the parent question to verify the request user is its author
+        const question = await QuestionModel.getQuestionById(answer.questionId);
+        if (!question) return sendErrorResponse(res, 404, 'Parent question not found.');
+        
+        if (question.author.authorId !== userId) {
+            return sendErrorResponse(res, 403, 'Only the question author can accept or unaccept answers.');
+        }
+        
+        const acceptedAt = accepted ? new Date() : null;
+        const updatedAnswer = await AnswerModel.updateAnswerStatus(answerId, accepted, acceptedAt);
+        if (!updatedAnswer) return sendErrorResponse(res, 424, 'Failed to update answer acceptance status.');
+        
+        return res.status(200).json({
+            data: { answer: updatedAnswer },
+            message: 'Answer acceptance status updated successfully.',
+        });
+    } catch (error) {
+        if (process.env.NODE_ENV === 'development') console.log(error);
+        if (error.message === 'NOT_FOUND') return sendErrorResponse(res, 404, 'Answer not found.');
+        return sendErrorResponse(res, 500, 'Internal Server Error');
     }
 };

@@ -4,22 +4,29 @@ import { withTransaction } from '../db/client.js';
 const getCommentsByParentId = async (parentId) => {
     const query = `
         SELECT
-            cm.parent_id,
-            cm.content_id,
-            cm.depth_level,
+            cm.parent_id as "parentId",
+            cm.content_id as "id",
             c.body,
-            c.vote_score,
-            c.author_id,
-            c.created_at,
-            c.updated_at,
-            p.first_name,
-            p.last_name,
-            p.profile_picture,
-            u.username
+            c.vote_score as "voteScore",
+            c.author_id as "authorId",
+            c.created_at as "createdAt",
+            c.updated_at as "updatedAt",
+            jsonb_build_object(
+                'authorId', c.author_id,
+                'username', u.username,
+                'firstName', p.first_name,
+                'lastName', p.last_name,
+                'profilePicture', p.profile_picture
+            ) as "author",
+            jsonb_build_object(
+                'recipientId', r.user_id,
+                'recipientUsername', r.username
+            ) as "recipient"
         FROM comment cm
         JOIN content c ON cm.content_id = c.content_id
         LEFT JOIN profile p ON c.author_id = p.user_id
         LEFT JOIN "user" u ON c.author_id = u.user_id
+        LEFT JOIN "user" r ON cm.recipient_id = r.user_id
         WHERE cm.parent_id = $1
         ORDER BY c.created_at
     `;
@@ -34,20 +41,28 @@ const getCommentsByParentId = async (parentId) => {
 const getCommentById = async (commentId) => {
     const query = `
         SELECT
-            cm.*,
+            cm.content_id as "id",
+            cm.parent_id as "parentId",
             c.body,
-            c.author_id,
-            c.vote_score,
-            c.created_at,
-            c.updated_at,
-            p.first_name,
-            p.last_name,
-            p.profile_picture,
-            u.username
+            c.vote_score as "voteScore",
+            c.created_at as "createdAt",
+            c.updated_at as "updatedAt",
+            jsonb_build_object(
+                'authorId', c.author_id,
+                'username', u.username,
+                'firstName', p.first_name,
+                'lastName', p.last_name,
+                'profilePicture', p.profile_picture
+            ) as "author",
+            jsonb_build_object(
+                'recipientId', r.user_id,
+                'recipientUsername', r.username
+            ) as "recipient"
         FROM comment cm
         JOIN content c ON cm.content_id = c.content_id
         LEFT JOIN profile p ON c.author_id = p.user_id
         LEFT JOIN "user" u ON c.author_id = u.user_id
+        LEFT JOIN "user" r ON cm.recipient_id = r.user_id
         WHERE cm.content_id = $1
     `;
     const result = await pool.query(
@@ -55,21 +70,18 @@ const getCommentById = async (commentId) => {
         [commentId]
     );
     
-    return result.rows[0] || null;
+    if (result.rowCount === 0) return null;
+    
+    const nestedComments = await getCommentsByParentId(commentId);
+    
+    return {
+        ...result.rows[0],
+        nestedComments,
+    };
 };
 
-const createComment = async (userId, parentId, body) => {
+const createComment = async (userId, parentId, recipientId, body) => {
     const result = await withTransaction(async (client) => {
-        // Determine depth_level based on the parent_id
-        const parentCheck = await client.query(
-            `SELECT depth_level FROM comment WHERE content_id = $1`,
-            [parentId]
-        );
-        
-        const depthLevel = parentCheck.rowCount > 0
-            ? parentCheck.rows[0]['depth_level'] + 1
-            : 0;
-        
         const content = await client.query(
             `INSERT INTO content (content_type, author_id, body)
             VALUES ('comment', $1, $2) RETURNING *`,
@@ -77,9 +89,9 @@ const createComment = async (userId, parentId, body) => {
         );
         
         const commentResult = await client.query(
-            `INSERT INTO comment (parent_id, content_id, depth_level)
+            `INSERT INTO comment (parent_id, content_id, recipient_id)
             VALUES ($1, $2, $3) RETURNING *`,
-            [parentId, content.rows[0]["content_id"], depthLevel]
+            [parentId, content.rows[0]["content_id"], recipientId]
         );
         
         return commentResult.rows[0];
@@ -106,7 +118,8 @@ const updateComment = async (commentId, body, authorId) => {
         return updateContent.rows[0];
     });
     
-    return result || null;
+    if (!result) return null;
+    return getCommentById(result["content_id"]);
 };
 
 const deleteComment = async (commentId, userId) => {
@@ -120,7 +133,7 @@ const deleteComment = async (commentId, userId) => {
             throw new Error('NOT_FOUND');
         }
         
-        if (check.rows[0].author_id !== userId) {
+        if (check.rows[0]['author_id'] !== userId) {
             throw new Error('UNAUTHORIZED');
         }
         

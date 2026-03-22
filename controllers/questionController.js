@@ -76,24 +76,7 @@ export const getQuestionById = async (req, res) => {
         
         return res.status(200).json({
             data: {
-                question: {
-                    id: question['content_id'],
-                    title: question['title'],
-                    body: question['body'],
-                    voteScore: question['vote_score'],
-                    createdAt: question['created_at'],
-                    updatedAt: question['updated_at'],
-                    viewCount: question['view_count'],
-                    answersCount: question['answers_count'],
-                    lastActivityAt: question['last_activity_at'],
-                    tags: question['tags'],
-                    author: {
-                        username: question['username'],
-                        firstName: question['first_name'],
-                        lastName: question['last_name'],
-                        profilePicture: question['profile_picture'],
-                    }
-                }
+                question: question,
             },
             message: 'Question retrieved successfully.'
         })
@@ -160,7 +143,7 @@ export const editQuestion = async (req, res) => {
         }
         
         // Check if the user is the author of the question
-        if (question['author_id'] !== userId) {
+        if (question.author.authorId !== userId) {
             return sendErrorResponse(
                 res,
                 403,
@@ -183,26 +166,10 @@ export const editQuestion = async (req, res) => {
                 'Failed to update question.'
             )
         }
-        // TODO: Tags update
         
         return res.status(200).json({
             data: {
-                question: {
-                    id: updatedQuestion['content_id'],
-                    title: updatedQuestion['title'],
-                    body: updatedQuestion['body'],
-                    voteScore: updatedQuestion['vote_score'],
-                    createdAt: updatedQuestion['created_at'],
-                    updatedAt: updatedQuestion['updated_at'],
-                    viewCount: updatedQuestion['view_count'],
-                    answersCount: updatedQuestion['answers_count'],
-                    lastActivityAt: updatedQuestion['last_activity_at'],
-                    author: {
-                        firstName: question['first_name'],
-                        lastName: question['last_name'],
-                        profilePicture: question['profile_picture'],
-                    }
-                }
+                question: updatedQuestion,
             }
         })
     } catch (error) {
