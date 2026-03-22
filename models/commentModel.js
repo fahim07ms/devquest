@@ -14,10 +14,12 @@ const getCommentsByParentId = async (parentId) => {
             c.updated_at,
             p.first_name,
             p.last_name,
-            p.profile_picture
+            p.profile_picture,
+            u.username
         FROM comment cm
         JOIN content c ON cm.content_id = c.content_id
-        JOIN profile p ON c.author_id = p.user_id
+        LEFT JOIN profile p ON c.author_id = p.user_id
+        LEFT JOIN "user" u ON c.author_id = u.user_id
         WHERE cm.parent_id = $1
         ORDER BY c.created_at
     `;
@@ -40,10 +42,12 @@ const getCommentById = async (commentId) => {
             c.updated_at,
             p.first_name,
             p.last_name,
-            p.profile_picture
+            p.profile_picture,
+            u.username
         FROM comment cm
         JOIN content c ON cm.content_id = c.content_id
-        JOIN profile p ON c.author_id = p.user_id
+        LEFT JOIN profile p ON c.author_id = p.user_id
+        LEFT JOIN "user" u ON c.author_id = u.user_id
         WHERE cm.content_id = $1
     `;
     const result = await pool.query(
@@ -54,7 +58,7 @@ const getCommentById = async (commentId) => {
     return result.rows[0] || null;
 };
 
-const createComment = async (parentId, userId, body) => {
+const createComment = async (userId, parentId, body) => {
     const result = await withTransaction(async (client) => {
         // Determine depth_level based on the parent_id
         const parentCheck = await client.query(
@@ -78,19 +82,11 @@ const createComment = async (parentId, userId, body) => {
             [parentId, content.rows[0]["content_id"], depthLevel]
         );
         
-        return {
-            id: commentResult.rows[0]["content_id"],
-            parentId: commentResult.rows[0]["parent_id"],
-            depthLevel: commentResult.rows[0]["depth_level"],
-            authorId: content.rows[0]["author_id"],
-            body: content.rows[0]["body"],
-            voteScore: content.rows[0]["vote_score"],
-            createdAt: content.rows[0]["created_at"],
-            updatedAt: content.rows[0]["updated_at"],
-        };
+        return commentResult.rows[0];
     });
     
-    return result || null;
+    if (!result) return null;
+    return getCommentById(result["content_id"]);
 }
 
 const updateComment = async (commentId, body, authorId) => {

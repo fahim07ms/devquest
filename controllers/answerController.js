@@ -30,6 +30,7 @@ export const getAnswersByQuestionId = async (req, res) => {
                     createdAt: a['created_at'],
                     updatedAt: a['updated_at'],
                     author: {
+                        username: a['username'],
                         firstName: a['first_name'],
                         lastName: a['last_name'],
                         profilePicture: a['profile_picture'],

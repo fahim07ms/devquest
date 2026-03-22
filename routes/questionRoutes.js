@@ -7,7 +7,8 @@ import {
     getQuestions,
     getQuestionById,
     editQuestion,
-    deleteQuestion
+    deleteQuestion,
+    updateQuestionViewCount
 } from '../controllers/questionController.js';
 
 import {

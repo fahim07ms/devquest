@@ -4,9 +4,12 @@ import { sendErrorResponse } from "../utils/error.js";
 // Get comments for a question or any content using parent ID
 export const getCommentsByParentId = async (req, res) => {
     const { questionId } = req.params;
+    const { answerId } = req.params;
+    
+    const parentId = answerId || questionId;
     
     try {
-        const comments = await CommentModel.getCommentsByParentId(questionId);
+        const comments = await CommentModel.getCommentsByParentId(parentId);
         
         return res.status(200).json({
             data: {
@@ -19,6 +22,7 @@ export const getCommentsByParentId = async (req, res) => {
                     createdAt: c['created_at'],
                     updatedAt: c['updated_at'],
                     author: {
+                        username: c['username'],
                         firstName: c['first_name'],
                         lastName: c['last_name'],
                         profilePicture: c['profile_picture'],
@@ -38,13 +42,18 @@ export const getCommentsByParentId = async (req, res) => {
     }
 };
 
+
 // Create a comment on a question
 export const createComment = async (req, res) => {
     const { questionId } = req.params;
+    const { answerId } = req.params;
+    
+    const parentId = answerId || questionId;
+    
     const { body } = req.body;
     
     try {
-        const comment = await CommentModel.createComment(req.userId, questionId, body);
+        const comment = await CommentModel.createComment(req.userId, parentId, body);
         
         if (!comment) {
             return sendErrorResponse(
@@ -56,7 +65,21 @@ export const createComment = async (req, res) => {
         
         return res.status(201).json({
             data: {
-                comment: comment
+                comment: {
+                    id: comment['content_id'],
+                    parentId: comment['parent_id'],
+                    depthLevel: comment['depth_level'],
+                    body: comment['body'],
+                    voteScore: comment['vote_score'],
+                    createdAt: comment['created_at'],
+                    updatedAt: comment['updated_at'],
+                    author: {
+                        username: comment['username'],
+                        firstName: comment['first_name'],
+                        lastName: comment['last_name'],
+                        profilePicture: comment['profile_picture'],
+                    },
+                }
             },
             message: 'Comment created successfully.'
         })

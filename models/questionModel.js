@@ -1,12 +1,11 @@
-import { withTransaction } from "../db/client.js";
+import {withTransaction} from "../db/client.js";
 import pool from "../db/pool.js";
 
 // Get all questions with pagination, sorting, filtering and search
-const getQuestions = async (limit, offset, sortBy, sortOrder, filters, search) => {
-    try {
-        // TODO: Implement tag filters
-        
-        const query = `
+// Probable filters: tags, creation date, last activity date, unanswered, highest score
+const getQuestions = async (limit, offset, sortBy, sortOrder, tags, search, answered) => {
+    // Initialize query with basic columns and joins
+    let initQuery = `
             SELECT
                 c.content_id as "id",
                 q.title,
@@ -18,33 +17,86 @@ const getQuestions = async (limit, offset, sortBy, sortOrder, filters, search) =
                 c.created_at as "createdAt",
                 c.updated_at as "updatedAt",
                 jsonb_build_object(
+                    'username', u.username,
                     'firstName', p.first_name,
                     'lastName', p.last_name,
                     'profilePicture', p.profile_picture
                 ) as "author",
-                COALESCE(
-                    jsonb_agg(
-                        jsonb_build_object('id', t.tag_id, 'name', t.name)
-                    ) FILTER (WHERE t.tag_id IS NOT NULL),
-                    '[]'::jsonb
-                ) as "tags"
+                (
+                    SELECT
+                        ARRAY_AGG(jsonb_build_object(
+                                  'tag_id', t.tag_id,
+                                  'name', t.name
+                                  )) AS "tags"
+                    FROM question_tag qt
+                    JOIN tag t ON qt.tag_id = t.tag_id
+                    WHERE qt.question_id = q.content_id
+                    GROUP BY qt.question_id
+                )
             FROM question q
             JOIN content c ON q.content_id = c.content_id
-            JOIN profile p ON c.author_id = p.user_id
-            LEFT JOIN question_tag qt ON qt.question_id = q.content_id
-            LEFT JOIN tag t ON t.tag_id = qt.tag_id
-            WHERE LOWER(q.title) LIKE LOWER('%' || $1 || '%')
-            GROUP BY c.content_id, q.content_id, p.user_id
-            ORDER BY ${sortBy} ${sortOrder}
-            LIMIT $2 OFFSET $3
+            LEFT JOIN profile p ON c.author_id = p.user_id
+            LEFT JOIN "user" u ON c.author_id = u.user_id
+            WHERE q.title ILIKE ('%' || $1 || '%')
         `;
+    
+    let totalQuestionsQuery = `
+        SELECT COUNT(*) FROM question q
+        WHERE q.title ILIKE ('%' || $1 || '%')
+    `;
+    let params = [search];
+    let paramCount = 2;
+    
+    // Add tags filter if provided
+    const hasTags = tags && tags.length > 0
+    
+    if (hasTags) {
+        const tagPlaceholders = tags.map((_, i) => `$${i + paramCount}`).join(', ')
         
+        const tagClause = `AND q.content_id IN (
+            SELECT question_id FROM question_tag WHERE tag_id IN (${tagPlaceholders})
+        )`;
+        paramCount += tags.length;
+        initQuery += tagClause;
+        totalQuestionsQuery += tagClause;
+        params = params.concat(tags);
+    }
+    
+    // Add answered filter if provided
+    if (answered !== undefined)
+    {
+        initQuery += `AND q.is_answered = $${paramCount}`;
+        totalQuestionsQuery += `AND q.is_answered = $${paramCount}`;
+        params.push(answered);
+        paramCount++;
+    }
+    
+    // Add sorting and pagination
+    initQuery += ` ORDER BY ${sortBy} ${sortOrder} LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+    params.push(limit);
+    params.push(offset);
+    try {
+        // Execute the query with the provided parameters
         const result = await pool.query(
-            query,
-            [search, limit, offset]
+            initQuery,
+            params
         );
         
-        return result.rows;
+        // Fetch total questions count
+        const allQuestions = await pool.query(
+            totalQuestionsQuery,
+            params.slice(0, paramCount - 1)
+        );
+        const totalQuestions = allQuestions.rows[0].count;
+        const totalPages = Math.ceil(totalQuestions / limit);
+        const currentPage = Math.floor(offset / limit) + 1;
+        
+        return {
+            questions: result.rows,
+            totalQuestions,
+            totalPages,
+            currentPage,
+        }
         
     } catch (error) {
         throw error;
@@ -61,19 +113,39 @@ const getQuestionById = async (id) => {
             c.updated_at,
             p.first_name,
             p.last_name,
-            p.profile_picture
+            p.profile_picture,
+            u.username
         FROM question q
             LEFT JOIN content c ON q.content_id = c.content_id
             LEFT JOIN profile p ON c.author_id = p.user_id
+            LEFT JOIN "user" u ON c.author_id = u.user_id
         WHERE q.content_id = $1
     `;
     
-    const result = await pool.query(
-        query,
-        [id]
-    );
+    const result = await withTransaction(async (client) => {
+        const question = await client.query(
+            query,
+            [id]
+        );
+        
+        if (question.rowCount === 0) return null;
+        
+        const tags = await client.query(
+            `
+            SELECT t.tag_id, t.name FROM question_tag qt
+            JOIN tag t ON qt.tag_id = t.tag_id
+            WHERE qt.question_id = $1
+        `,
+            [id]
+        );
+        
+        return {
+            ...question.rows[0],
+            tags: tags.rows,
+        }
+    })
     
-    return result.rows[0] || null;
+    return result;
 }
 
 const createQuestion = async (userId, title, body, tags) => {
@@ -90,7 +162,13 @@ const createQuestion = async (userId, title, body, tags) => {
             [content.rows[0]["content_id"], title]
         );
         
-        // TODO: ADD TAGS
+        for (const tag of tags) {
+            await client.query(
+                `INSERT INTO question_tag (question_id, tag_id)
+                VALUES ($1, $2)`,
+                [qnResult.rows[0]["content_id"], tag["tag_id"]]
+            )
+        }
         
         return {
             id: qnResult.rows[0]["content_id"],
@@ -103,6 +181,7 @@ const createQuestion = async (userId, title, body, tags) => {
             viewCount: qnResult.rows[0]["view_count"],
             answersCount: qnResult.rows[0]["answers_count"],
             lastActivityAt: qnResult.rows[0]["last_activity_at"],
+            tags: tags
         }
     });
     
@@ -163,10 +242,20 @@ const deleteQuestion = async (questionId, userId) => {
     return result || null;
 }
 
+const updateViewCount = async (questionId) => {
+    await pool.query(
+        `UPDATE question
+        SET view_count = view_count + 1
+        WHERE content_id = $1`,
+        [questionId]
+    );
+}
+
 export default {
     getQuestions,
     getQuestionById,
     createQuestion,
     updateQuestion,
     deleteQuestion,
+    updateViewCount,
 }

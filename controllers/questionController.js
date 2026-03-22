@@ -2,17 +2,15 @@ import QuestionModel from '../models/questionModel.js';
 import {sendErrorResponse} from "../utils/error.js";
 
 const sortOptions = {
-    'createdAt': 'created_at',
-    'updatedAt': 'updated_at',
-    'viewCount': 'view_count',
-    'answersCount': 'answers_count',
-    'lastActivityAt': 'last_activity_at',
-    'voteScore': 'vote_score',
+    'createdAt': 'c.created_at',
+    'answersCount': 'q.answer_count',
+    'lastActivityAt': 'q.last_activity_at',
+    'voteScore': 'c.vote_score',
 }
 
 // Get all questions with pagination, sorting, filtering and search
 export const getQuestions = async (req, res) => {
-    let { page, limit, sort, order, search } = req.query;
+    let { page, limit, sort, order, search, answered } = req.query;
     
     if (isNaN(page) || page <= 0) {
         page = 1;
@@ -22,26 +20,30 @@ export const getQuestions = async (req, res) => {
         limit = 10;
     }
     
-    const offset = (page - 1) * limit;
     const limitValue = parseInt(limit, 10) || 10;
+    const offset = (page - 1) * limitValue;
     const sortValue = sortOptions[sort] || sortOptions['createdAt'];
     const orderValue = order === 'asc' ? 'ASC' : 'DESC';
     const searchValue = search || '';
     const tags = req.query.tags ? req.query.tags.split(',') : [];
-    console.log(sortValue, orderValue, tags, searchValue, limitValue, offset)
+    
     try {
-        const questions = await QuestionModel.getQuestions(
+        const { questions, totalQuestions, currentPage, totalPages } = await QuestionModel.getQuestions(
             limitValue,
             offset,
             sortValue,
             orderValue,
             tags,
-            searchValue
+            searchValue,
+            answered
         );
         
         return res.status(200).json({
             data: {
-                questions: questions
+                questions: questions,
+                totalQuestions: totalQuestions,
+                totalPages: totalPages,
+                currentPage: currentPage,
             },
             message: 'Questions retrieved successfully.'
         });
@@ -84,7 +86,9 @@ export const getQuestionById = async (req, res) => {
                     viewCount: question['view_count'],
                     answersCount: question['answers_count'],
                     lastActivityAt: question['last_activity_at'],
+                    tags: question['tags'],
                     author: {
+                        username: question['username'],
                         firstName: question['first_name'],
                         lastName: question['last_name'],
                         profilePicture: question['profile_picture'],
@@ -266,3 +270,24 @@ export const deleteQuestion = async (req, res) => {
         )
     }
 };
+
+// Update Question View Count
+export const updateQuestionViewCount = async (req, res) => {
+    const { questionId } = req.params;
+    
+    try {
+        await QuestionModel.updateViewCount(questionId);
+        
+        return res.status(200).json({
+            message: 'Question view count updated successfully.'
+        })
+    } catch (error) {
+        if (process.env.NODE_ENV === 'development') console.log(error);
+        
+        return sendErrorResponse(
+            res,
+             500,
+            'Internal Server Error',
+        );
+    }
+}

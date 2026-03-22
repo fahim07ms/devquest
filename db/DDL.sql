@@ -190,6 +190,7 @@ CREATE TABLE IF NOT EXISTS "question" (
     title VARCHAR(300) NOT NULL,
     view_count INTEGER NOT NULL DEFAULT 0,
     answer_count INTEGER NOT NULL DEFAULT 0,
+    is_answered BOOLEAN NOT NULL DEFAULT FALSE,
     last_activity_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     -- Constraints

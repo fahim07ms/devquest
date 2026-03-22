@@ -14,10 +14,12 @@ const getAnswersByQuestionId = async (questionId) => {
             c.author_id,
             p.first_name,
             p.last_name,
-            p.profile_picture
+            p.profile_picture,
+            u.username
         FROM answer a
         JOIN content c ON a.content_id = c.content_id
         JOIN profile p ON c.author_id = p.user_id
+        LEFT JOIN "user" u ON c.author_id = u.user_id
         WHERE a.question_id = $1
         ORDER BY
             a.is_accepted DESC,
@@ -44,10 +46,12 @@ const getAnswerById = async (answerId) => {
             c.updated_at,
             p.first_name,
             p.last_name,
-            p.profile_picture
+            p.profile_picture,
+            u.username
         FROM answer a
         JOIN content c ON a.content_id = c.content_id
-        JOIN profile p ON c.author_id = p.user_id
+        LEFT JOIN profile p ON c.author_id = p.user_id
+        LEFT JOIN "user" u ON c.author_id = u.user_id
         WHERE a.content_id = $1
     `;
     const result = await pool.query(
@@ -58,7 +62,7 @@ const getAnswerById = async (answerId) => {
     return result.rows[0] || null;
 }
 
-const createAnswer = async (questionId, userId, body) => {
+const createAnswer = async (userId, questionId, body) => {
     const result = await withTransaction(async (client) => {
         const content = await client.query(
             `INSERT INTO content (content_type, author_id, body)
@@ -68,21 +72,11 @@ const createAnswer = async (questionId, userId, body) => {
         
         const answerResult = await client.query(
             `INSERT INTO answer (question_id, content_id)
-            VALUES ($1, $2) RETURNING *`,
+            VALUES ($1, $2)`,
             [questionId, content.rows[0]["content_id"]]
         );
         
-        return {
-            id: answerResult.rows[0]["content_id"],
-            questionId: answerResult.rows[0]["question_id"],
-            authorId: content.rows[0]["author_id"],
-            body: content.rows[0]["body"],
-            voteScore: content.rows[0]["vote_score"],
-            createdAt: content.rows[0]["created_at"],
-            updatedAt: content.rows[0]["updated_at"],
-            isAccepted: answerResult.rows[0]["is_accepted"],
-            acceptedAt: answerResult.rows[0]["accepted_at"],
-        }
+        return getAnswerById(answerResult.rows[0]["content_id"]);
     });
     
     return result || null;
