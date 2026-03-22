@@ -1,157 +1,342 @@
 'use client'
 
-import { useState } from 'react'
-import type { Comment } from '@/types'
-import { UserAvatar } from '@/components/ui/UserAvatar'
-import { TiptapContent } from '@/components/editor/TiptapContent'
-import { TiptapEditor } from '@/components/editor/TiptapEditor'
-import { Button } from '@/components/ui/button'
+import type { Comment as CommentType } from '@/types'
 import { useAuthStore } from '@/store/authStore'
+import { useState } from 'react'
+import { JSONContent } from '@tiptap/core'
 import { toast } from 'sonner'
+import api from '@/lib/api'
 import { cn } from '@/lib/utils'
-import { ChatDots, CaretDown, CaretUp } from '@phosphor-icons/react'
+import { UserAvatar } from '@/components/ui/UserAvatar'
+import { formatDistanceToNow } from 'date-fns'
+import { InlineEditFooter } from '@/components/questions/InlineEditFooter'
+import { TiptapContent } from '@/components/editor/TiptapContent'
+import { ActionBtn } from '@/components/questions/ActionBtn'
+import { ArrowBendDownRightIcon, PencilSimpleLineIcon, TrashIcon } from '@phosphor-icons/react'
+import { Button } from '@/components/ui/button'
+import TiptapEditor from '@/components/editor/TiptapEditor'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 
-interface CommentThreadProps {
-    comments: Comment[]
+export function CommentThread({
+                                  comments,
+                                  parentId,
+                                  parentType,
+                                  currentUserId,
+                                  recipientId,
+                                  onCommentAdded,
+                                  onCommentEdited,
+                                  onCommentDeleted,
+                              }: {
+    comments: CommentType[]
     parentId: string
-    onAddComment: (parentId: string, body: object) => Promise<void>
-    className?: string
-}
-
-export function CommentThread({ comments, parentId, onAddComment, className }: CommentThreadProps) {
+    parentType: 'question' | 'answer'
+    currentUserId?: string
+    // The owner of the parent content — used as default recipient
+    // when someone adds a comment (not a reply to another comment)
+    recipientId?: string
+    onCommentAdded:   (parentId: string, comment: CommentType) => void
+    onCommentEdited:  (commentId: string, updated: CommentType) => void
+    onCommentDeleted: (commentId: string) => void
+}) {
     const { isAuthenticated } = useAuthStore()
-    const [isExpanded, setIsExpanded] = useState(false)
-    const [showEditor, setShowEditor] = useState(false)
-    const [commentBody, setCommentBody] = useState<object>({})
-    const [isSubmitting, setIsSubmitting] = useState(false)
 
-    const handleSubmit = async () => {
-        if (!isAuthenticated) {
-            toast.error('You must be logged in to comment.')
-            return
-        }
-        const isEmpty =
-            !commentBody ||
-            JSON.stringify(commentBody) === '{}' ||
-            (commentBody as { content?: unknown[] })?.content?.length === 0
-        if (isEmpty) {
-            toast.error('Comment cannot be empty.')
-            return
-        }
-        setIsSubmitting(true)
+    // Editor shown when clicking `Add a comment` or replying to a comment
+    const [showEditor, setShowEditor]           = useState(false)
+    const [newBody, setNewBody]                 = useState<JSONContent>({})
+    const [replyPrefix, setReplyPrefix]         = useState('')
+
+    // The recipientId to attach when posting — either the reply target or the parent author
+    const [activeRecipientId, setActiveRecipientId] = useState<string | undefined>(undefined)
+    const [isPosting, setIsPosting]             = useState(false)
+
+    // Editing a comment
+    const [editingId, setEditingId]             = useState<string | null>(null)
+    const [editBody, setEditBody]               = useState<JSONContent>({})
+    const [isSavingEdit, setIsSavingEdit]       = useState(false)
+
+    // Drives the AlertDialog — holds the id of the comment pending deletion
+    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+
+    // Open the editor. When replying to a specific comment, wire up that
+    // comment's author as recipient. When clicking "Add a comment" use
+    // the parent content owner (recipientId prop) as the default.
+    const openReply = (username?: string, commentAuthorId?: string) => {
+        setReplyPrefix(username ? `@${username}` : '')
+        setActiveRecipientId(commentAuthorId ?? recipientId)
+        setShowEditor(true)
+    }
+
+    // Create a new comment
+    const handlePost = async () => {
+        const empty =
+            !newBody ||
+            JSON.stringify(newBody) === '{}' ||
+            (newBody as any)?.content?.length === 0
+        if (empty) return toast.error('Comment cannot be empty.')
+
+        setIsPosting(true)
         try {
-            await onAddComment(parentId, commentBody)
-            setCommentBody({})
+            const url =
+                parentType === 'question'
+                    ? `/questions/${parentId}/comments`
+                    : `/answers/${parentId}/comments`
+
+            const res = await api.post(url, {
+                body: newBody,
+                recipientId: activeRecipientId,
+            })
+
+            onCommentAdded(parentId, res.data.data.comment)
+            setNewBody({})
+            setReplyPrefix('')
+            setActiveRecipientId(undefined)
             setShowEditor(false)
             toast.success('Comment posted.')
         } catch {
             toast.error('Failed to post comment.')
         } finally {
-            setIsSubmitting(false)
+            setIsPosting(false)
         }
     }
 
-    const hasComments = comments.length > 0
+    // Edit an existing comment
+    const handleSaveEdit = async (commentId: string) => {
+        const empty =
+            !editBody ||
+            JSON.stringify(editBody) === '{}' ||
+            (editBody as any)?.content?.length === 0
+        if (empty) return toast.error('Comment cannot be empty.')
+        setIsSavingEdit(true)
+        try {
+            const res = await api.put(`/comments/${commentId}`, { body: editBody })
+            onCommentEdited(commentId, res.data.data.comment)
+            setEditingId(null)
+            toast.success('Comment updated.')
+        } catch {
+            toast.error('Failed to update comment.')
+        } finally {
+            setIsSavingEdit(false)
+        }
+    }
+
+    // Delete a comment.
+    const handleConfirmDelete = async () => {
+        if (!pendingDeleteId) return
+        try {
+            await api.delete(`/comments/${pendingDeleteId}`)
+            onCommentDeleted(pendingDeleteId)
+            toast.success('Comment deleted.')
+        } catch {
+            toast.error('Failed to delete comment.')
+        } finally {
+            setPendingDeleteId(null)
+        }
+    }
 
     return (
-        <div className={cn('mt-2', className)}>
-            {/* Toggle trigger */}
-            <button
-                type="button"
-                onClick={() => setIsExpanded((v) => !v)}
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/70 hover:text-primary transition-colors duration-150 py-1"
-            >
-                <ChatDots className="h-3.5 w-3.5" />
-                {hasComments
-                    ? `${comments.length} comment${comments.length !== 1 ? 's' : ''}`
-                    : 'Add a comment'}
-                {hasComments && (
-                    isExpanded
-                        ? <CaretUp className="h-3 w-3" />
-                        : <CaretDown className="h-3 w-3" />
-                )}
-            </button>
+        <div className="mt-3">
+            {/* ── Comment list ── */}
+            {comments.length > 0 && (
+                <div className="border-t border-border/30 pt-3">
+                    {comments.map((comment, i) => {
+                        const isOwn     = !!currentUserId && comment.author?.authorId === currentUserId
+                        const isEditing = editingId === comment.id
+                        const recipientUsername = comment.recipient?.recipientUsername || 'anonymous'
 
-            {/* Expanded state */}
-            {isExpanded && (
-                <div className="mt-3 ml-1 pl-4 border-l border-border/50 space-y-0">
-                    {comments.map((comment, i) => (
-                        <div
-                            key={comment.id}
-                            className={cn(
-                                'flex gap-2.5 py-2.5',
-                                i < comments.length - 1 && 'border-b border-border/30'
-                            )}
-                        >
-                            <UserAvatar
-                                author={comment.author}
+                        return (
+                            <div
+                                key={comment.id}
+                                className={cn(
+                                    'group flex gap-2.5 py-2.5',
+                                    i < comments.length - 1 && 'border-b border-border/25'
+                                )}
+                            >
+                                <UserAvatar
+                                    author={comment.author}
+                                    size="sm"
+                                    showName={false}
+                                    className="flex-shrink-0 mt-0.5"
+                                />
+                                <div className="flex-1 min-w-0">
+                                    {/* Author → recipient + timestamp */}
+                                    <div className="flex items-baseline gap-1.5 mb-0.5 flex-wrap">
+                                        <span className="text-xs font-semibold text-foreground">
+                                            {[comment.author?.firstName, comment.author?.lastName]
+                                                    .filter(Boolean)
+                                                    .join(' ') ||
+                                                comment.author?.username ||
+                                                'Anonymous'}
+                                        </span>
+
+                                        {/* Always render recipient when the API provides it */}
+                                        {recipientUsername && (
+                                            <>
+                                                <span className="text-[10px] text-muted-foreground/40">→</span>
+                                                <span className="text-xs font-medium text-primary">
+                                                    @{recipientUsername}
+                                                </span>
+                                            </>
+                                        )}
+
+                                        <span className="text-[10px] text-muted-foreground/50 ml-auto mr-2">
+                                            {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                                        </span>
+                                    </div>
+
+                                    {/* Body */}
+                                    {isEditing ? (
+                                        <>
+                                            <TiptapEditor
+                                                onChange={setEditBody}
+                                                initialContent={comment.body as JSONContent}
+                                                minHeight="72px"
+                                            />
+                                            <InlineEditFooter
+                                                onSave={() => handleSaveEdit(comment.id)}
+                                                onCancel={() => setEditingId(null)}
+                                                isSaving={isSavingEdit}
+                                                saveLabel="Update"
+                                            />
+                                        </>
+                                    ) : (
+                                        <div className="text-xs text-foreground/80 leading-relaxed">
+                                            <TiptapContent content={comment.body} />
+                                        </div>
+                                    )}
+
+                                    {/* Hover actions */}
+                                    {!isEditing && (
+                                        <div className="flex items-center gap-3 mt-1 opacity-0 group-hover:opacity-100
+                                        transition-opacity duration-150">
+                                            {isAuthenticated && (
+                                                <ActionBtn
+                                                    onClick={() =>
+                                                        openReply(
+                                                            comment.author?.username,
+                                                            comment.author?.authorId
+                                                        )
+                                                    }
+                                                    icon={ArrowBendDownRightIcon}
+                                                    label="Reply"
+                                                />
+                                            )}
+                                            {isOwn && (
+                                                <>
+                                                    <ActionBtn
+                                                        onClick={() => {
+                                                            setEditingId(comment.id)
+                                                            setEditBody(comment.body as JSONContent)
+                                                        }}
+                                                        icon={PencilSimpleLineIcon}
+                                                        label="Edit"
+                                                    />
+
+                                                    {/* AlertDialog-driven delete */}
+                                                    <AlertDialog
+                                                        open={pendingDeleteId === comment.id}
+                                                        onOpenChange={(open) => {
+                                                            if (!open) setPendingDeleteId(null)
+                                                        }}
+                                                    >
+                                                        <AlertDialogTrigger asChild>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setPendingDeleteId(comment.id)}
+                                                                className="inline-flex items-center gap-1 text-xs
+                                                                text-muted-foreground hover:text-destructive
+                                                                transition-colors duration-150"
+                                                            >
+                                                                <TrashIcon className="h-3.5 w-3.5" />
+                                                                Delete
+                                                            </button>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>Delete comment?</AlertDialogTitle>
+                                                                <AlertDialogDescription>
+                                                                    This comment will be permanently removed and cannot
+                                                                    be recovered.
+                                                                </AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                <AlertDialogAction
+                                                                    onClick={handleConfirmDelete}
+                                                                    className="bg-destructive text-destructive-foreground
+                                                                    hover:bg-destructive/90"
+                                                                >
+                                                                    Delete
+                                                                </AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+
+            {/* ── Editor ── */}
+            {!showEditor ? (
+                isAuthenticated && (
+                    <button
+                        type="button"
+                        onClick={() => openReply()}
+                        className="mt-2 text-xs text-muted-foreground/60 hover:text-primary transition-colors duration-150"
+                    >
+                        + Add a comment
+                    </button>
+                )
+            ) : (
+                <div className="mt-3 space-y-2">
+                    <TiptapEditor
+                        onChange={setNewBody}
+                        placeholder={replyPrefix ? `Replying to ${replyPrefix}…` : 'Write a comment…'}
+                        minHeight="72px"
+                    />
+                    <div className="flex items-center justify-between">
+                        {replyPrefix && (
+                            <span className="text-[11px] text-muted-foreground/60">
+                                Replying to <span className="text-primary">{replyPrefix}</span>
+                            </span>
+                        )}
+                        <div className="flex items-center gap-2 ml-auto">
+                            <Button
+                                variant="ghost" size="sm"
+                                onClick={() => {
+                                    setShowEditor(false)
+                                    setReplyPrefix('')
+                                    setActiveRecipientId(undefined)
+                                }}
+                                className="h-7 px-3 text-xs"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
                                 size="sm"
-                                showName={false}
-                                className="flex-shrink-0 mt-0.5"
-                            />
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-baseline gap-2 mb-0.5">
-                                    <span className="text-xs font-semibold text-foreground leading-none">
-                                        {[comment.author.firstName, comment.author.lastName]
-                                            .filter(Boolean)
-                                            .join(' ') || comment.author.username || 'Anonymous'}
-                                    </span>
-                                    <span className="text-[10px] text-muted-foreground/60">
-                                        {new Date(comment.createdAt).toLocaleDateString('en-US', {
-                                            month: 'short',
-                                            day: 'numeric',
-                                        })}
-                                    </span>
-                                </div>
-                                <div className="text-xs text-foreground/80 leading-relaxed">
-                                    <TiptapContent content={comment.body} />
-                                </div>
-                            </div>
+                                onClick={handlePost}
+                                disabled={isPosting}
+                                className="h-7 px-3 text-xs shadow-none"
+                            >
+                                {isPosting ? 'Posting…' : 'Post'}
+                            </Button>
                         </div>
-                    ))}
-
-                    {/* Add comment */}
-                    {!showEditor ? (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (!isAuthenticated) {
-                                    toast.error('Log in to add a comment.')
-                                    return
-                                }
-                                setShowEditor(true)
-                            }}
-                            className="text-xs text-muted-foreground/60 hover:text-primary transition-colors duration-150 py-2 underline-offset-2 hover:underline"
-                        >
-                            + Add a comment
-                        </button>
-                    ) : (
-                        <div className="space-y-2 pt-2">
-                            <TiptapEditor
-                                placeholder="Write a short comment…"
-                                onChange={setCommentBody}
-                                minHeight="72px"
-                            />
-                            <div className="flex gap-2">
-                                <Button
-                                    size="sm"
-                                    onClick={handleSubmit}
-                                    disabled={isSubmitting}
-                                    className="h-7 text-xs px-3 rounded-md shadow-none"
-                                >
-                                    {isSubmitting ? 'Posting…' : 'Post'}
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => setShowEditor(false)}
-                                    className="h-7 text-xs px-3 rounded-md"
-                                >
-                                    Cancel
-                                </Button>
-                            </div>
-                        </div>
-                    )}
+                    </div>
                 </div>
             )}
         </div>

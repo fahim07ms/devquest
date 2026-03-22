@@ -6,6 +6,7 @@ export interface Tag {
 }
 
 export interface Author {
+    authorId: string;
     firstName: string | null;
     lastName: string | null;
     profilePicture: string | null;
@@ -38,6 +39,11 @@ export interface Answer {
     author: Author;
 }
 
+export interface Recipient {
+    recipientId: string;
+    recipientUsername: string;
+}
+
 export interface Comment {
     id: string;
     parentId: string;
@@ -47,6 +53,7 @@ export interface Comment {
     createdAt: string;
     updatedAt: string;
     author: Author;
+    recipient: Recipient;
 }
 
 export interface PaginatedResponse<T> {

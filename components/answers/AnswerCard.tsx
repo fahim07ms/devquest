@@ -1,85 +1,248 @@
 'use client'
 
-import { formatDistanceToNow } from 'date-fns'
-import type { Answer } from '@/types'
-import { UserAvatar } from '@/components/ui/UserAvatar'
-import { TiptapContent } from '@/components/editor/TiptapContent'
-import { VoteButtons } from '@/components/questions/VoteButtons'
-import { CheckCircle } from '@phosphor-icons/react'
+import type { Answer, Comment as CommentType } from '@/types'
+import { useState } from 'react'
+import { JSONContent } from '@tiptap/core'
+import { toast } from 'sonner'
+import api from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { VoteButtons } from '@/components/questions/VoteButtons'
+import { CheckCircleIcon, PencilSimpleLineIcon, TrashIcon } from '@phosphor-icons/react'
+import { InlineEditFooter } from '@/components/questions/InlineEditFooter'
+import { TiptapContent } from '@/components/editor/TiptapContent'
+import { ActionBtn } from '@/components/questions/ActionBtn'
+import { formatDistanceToNow } from 'date-fns'
+import { UserAvatar } from '@/components/ui/UserAvatar'
+import { CommentThread } from '@/components/comments/CommentThread'
+import TiptapEditor from '@/components/editor/TiptapEditor'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 
-interface AnswerCardProps {
+export function AnswerCard({
+                               answer,
+                               isQuestionAuthor,
+                               hasAcceptedAnswer,
+                               currentUserId,
+                               comments,
+                               onAccept,
+                               onEdited,
+                               onDeleted,
+                               onCommentAdded,
+                               onCommentEdited,
+                               onCommentDeleted,
+                           }: {
     answer: Answer
-    isQuestionAuthor?: boolean
-    onAccept?: (answerId: string) => void
-    children?: React.ReactNode
-    className?: string
-}
+    isQuestionAuthor: boolean
+    hasAcceptedAnswer: boolean
+    currentUserId?: string
+    comments: CommentType[]
+    onAccept:         (answerId: string, accepted: boolean) => void
+    onEdited:         (answerId: string, updated: Answer) => void
+    onDeleted:        (answerId: string) => void
+    onCommentAdded:   (parentId: string, comment: CommentType) => void
+    onCommentEdited:  (commentId: string, updated: CommentType) => void
+    onCommentDeleted: (commentId: string) => void
+}) {
+    const isOwn = !!currentUserId && answer.author?.authorId === currentUserId
 
-export function AnswerCard({ answer, isQuestionAuthor, onAccept, children, className }: AnswerCardProps) {
-    const timeAgo = formatDistanceToNow(new Date(answer.createdAt), { addSuffix: true })
+    const [isEditing, setIsEditing]         = useState(false)
+    const [editBody, setEditBody]           = useState<JSONContent>({})
+    const [isSaving, setIsSaving]           = useState(false)
+    const [isAccepting, setIsAccepting]     = useState(false)
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+
+    const handleSave = async () => {
+        const empty =
+            !editBody ||
+            JSON.stringify(editBody) === '{}' ||
+            (editBody as any)?.content?.length === 0
+        if (empty) return toast.error('Answer cannot be empty.')
+        setIsSaving(true)
+        try {
+            const res = await api.put(`/answers/${answer.id}`, { body: editBody })
+            onEdited(answer.id, res.data.data.answer)
+            setIsEditing(false)
+            toast.success('Answer updated.')
+        } catch {
+            toast.error('Failed to update answer.')
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
+    const handleConfirmDelete = async () => {
+        try {
+            await api.delete(`/answers/${answer.id}`)
+            onDeleted(answer.id)
+            toast.success('Answer deleted.')
+        } catch {
+            toast.error('Failed to delete answer.')
+        } finally {
+            setDeleteDialogOpen(false)
+        }
+    }
+
+    const handleAccept = async () => {
+        setIsAccepting(true)
+        try {
+            const newAccepted = !answer.isAccepted
+            await api.post(`/answers/${answer.id}/accept`, { accepted: newAccepted })
+            onAccept(answer.id, newAccepted)
+            toast.success(newAccepted ? 'Answer accepted.' : 'Acceptance removed.')
+        } catch {
+            toast.error('Failed to update acceptance.')
+        } finally {
+            setIsAccepting(false)
+        }
+    }
+
+    // Show accept button only when: question author AND (no accepted answer yet OR this one is accepted)
+    const showAcceptBtn = isQuestionAuthor && (!hasAcceptedAnswer || answer.isAccepted)
 
     return (
         <div
             className={cn(
-                'group relative flex gap-5 py-7 border-b border-border/40 last:border-0',
-                answer.isAccepted && 'bg-emerald-500/[0.03] rounded-xl px-4 -mx-4',
-                className
+                'group/answer relative flex gap-5 py-7 border-b border-border/40 last:border-0',
+                answer.isAccepted && 'bg-emerald-500/[0.03] px-2'
             )}
         >
-            {/* Accepted accent bar */}
             {answer.isAccepted && (
-                <div className="absolute left-0 top-6 bottom-6 w-0.5 bg-emerald-500/50 rounded-full" />
+                <div className="absolute left-0 top-6 bottom-6 w-0.5 bg-emerald-500/50" />
             )}
 
-            {/* ── Vote column ── */}
+            {/* ── Vote + accept column ── */}
             <div className="flex flex-col items-center gap-2.5 w-10 flex-shrink-0 pt-0.5">
                 <VoteButtons score={answer.voteScore} contentId={answer.id} />
 
-                {answer.isAccepted ? (
-                    <div
-                        title="Accepted answer"
-                        className="text-emerald-500 bg-emerald-500/10 p-1.5 rounded-full mt-1"
-                    >
-                        <CheckCircle weight="fill" className="h-5 w-5" />
-                    </div>
-                ) : isQuestionAuthor && onAccept ? (
+                {showAcceptBtn ? (
                     <button
-                        onClick={() => onAccept(answer.id)}
-                        title="Mark as accepted"
-                        className="text-muted-foreground/40 hover:text-emerald-500 transition-colors duration-150 p-1.5 rounded-full hover:bg-emerald-500/10 mt-1"
+                        type="button"
+                        onClick={handleAccept}
+                        disabled={isAccepting}
+                        title={answer.isAccepted ? 'Remove acceptance' : 'Accept this answer'}
+                        className={cn(
+                            'p-1.5 transition-colors duration-150 mt-1 disabled:opacity-40',
+                            answer.isAccepted
+                                ? 'text-emerald-500'
+                                : 'text-muted-foreground/40 hover:text-emerald-500'
+                        )}
                     >
-                        <CheckCircle className="h-5 w-5" />
+                        <CheckCircleIcon
+                            weight={answer.isAccepted ? 'fill' : 'regular'}
+                            className="h-5 w-5"
+                        />
                     </button>
+                ) : answer.isAccepted ? (
+                    <div className="text-emerald-500 mt-1" title="Accepted answer">
+                        <CheckCircleIcon weight="fill" className="h-5 w-5" />
+                    </div>
                 ) : null}
             </div>
 
             {/* ── Body ── */}
             <div className="flex-1 min-w-0">
-                {/* Answer content */}
-                <div className="text-foreground/90 text-sm leading-relaxed mb-6">
-                    <TiptapContent content={answer.body} />
-                </div>
-
-                {/* Author row */}
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        {/* placeholder for edit/share actions if needed */}
+                {isEditing ? (
+                    <>
+                        <TiptapEditor
+                            onChange={setEditBody}
+                            initialContent={answer.body as JSONContent}
+                            minHeight="200px"
+                        />
+                        <InlineEditFooter
+                            onSave={handleSave}
+                            onCancel={() => setIsEditing(false)}
+                            isSaving={isSaving}
+                            saveLabel="Update answer"
+                        />
+                    </>
+                ) : (
+                    <div className="text-foreground/90 text-sm leading-relaxed mb-6">
+                        <TiptapContent content={answer.body} />
                     </div>
+                )}
 
-                    <div className="flex items-center gap-2.5 bg-muted/30 border border-border/40 rounded-lg px-3 py-2">
-                        <div className="text-right">
-                            <p className="text-[10px] text-muted-foreground/70 leading-none mb-1">answered {timeAgo}</p>
+                {!isEditing && (
+                    <>
+                        <div className="flex items-end justify-between flex-wrap gap-3">
+                            <div className="flex items-center gap-3">
+                                {isOwn && (
+                                    <>
+                                        <ActionBtn
+                                            onClick={() => {
+                                                setEditBody(answer.body as JSONContent)
+                                                setIsEditing(true)
+                                            }}
+                                            icon={PencilSimpleLineIcon}
+                                            label="Edit"
+                                        />
+
+                                        {/* AlertDialog-driven delete */}
+                                        <AlertDialog
+                                            open={deleteDialogOpen}
+                                            onOpenChange={setDeleteDialogOpen}
+                                        >
+                                            <AlertDialogTrigger asChild>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setDeleteDialogOpen(true)}
+                                                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors duration-150"
+                                                >
+                                                    <TrashIcon className="h-3.5 w-3.5" />
+                                                    Delete
+                                                </button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Delete answer?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        This answer and all its comments will be permanently removed. This action cannot be undone.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction
+                                                        onClick={handleConfirmDelete}
+                                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                    >
+                                                        Delete
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </>
+                                )}
+                            </div>
+
+                            <div className="flex items-center gap-2.5 bg-muted/30 border border-border/40 px-3 py-2">
+                                <p className="text-[10px] text-muted-foreground/70 leading-none">
+                                    answered {formatDistanceToNow(new Date(answer.createdAt), { addSuffix: true })}
+                                </p>
+                                <UserAvatar author={answer.author} size="sm" />
+                            </div>
                         </div>
-                        <UserAvatar author={answer.author} size="sm" />
-                    </div>
-                </div>
 
-                {/* Comment thread slot */}
-                {children && (
-                    <div className="mt-5 pt-4 border-t border-border/30">
-                        {children}
-                    </div>
+                        <div className="mt-5 pt-4 border-t border-border/30">
+                            <CommentThread
+                                comments={comments}
+                                parentId={answer.id}
+                                parentType="answer"
+                                currentUserId={currentUserId}
+                                recipientId={answer.author?.authorId}
+                                onCommentAdded={onCommentAdded}
+                                onCommentEdited={onCommentEdited}
+                                onCommentDeleted={onCommentDeleted}
+                            />
+                        </div>
+                    </>
                 )}
             </div>
         </div>

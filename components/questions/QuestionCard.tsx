@@ -66,9 +66,9 @@ export function QuestionCard({ question, className }: QuestionCardProps) {
                 </div>
 
                 <div className={cn(
-                    'flex gap-2 items-center text-center leading-none px-2 py-1.5',
+                    'flex gap-2 items-center text-center leading-none py-1',
                     hasAnswers
-                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/20'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1 ring-1 ring-emerald-500/20'
                         : 'text-muted-foreground/60'
                 )}>
                     <span className="text-sm font-bold tabular-nums">{question.answersCount}</span>
