@@ -3,23 +3,27 @@ import UserModel from "../models/userModel.js";
 import cloudinary from "../config/cloudinary";
 
 export const getUserDetails = async (req, res) => {
+    const { username } = req.params;
+    let user = null;
+    
     try {
-        const user = await UserModel.getUserById(req.userId);
+        if (username) {
+            user = await UserModel.getUserByUsername(username);
+        } else {
+            user = await UserModel.getUserById(req.userId);
+        }
+        
+        if (!user) {
+            return sendErrorResponse(
+                res,
+                 404,
+                "User not found."
+            )
+        }
         
         return res.status(200).json({
             data: {
-                user: {
-                    id: user.id,
-                    username: user.username,
-                    email: user.email,
-                    role: user.role,
-                    isActive: user.isActive,
-                    reputationPoints: user.reputationPoints,
-                    badgeCount: user.badgeCount,
-                    firstName: user.firstName,
-                    lastName: user.lastName,
-                    profilePicture: user.profilePicture,
-                }
+                user: user,
             },
             message: "User details retrieved successfully."
         });

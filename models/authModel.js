@@ -1,38 +1,6 @@
 import pool from '../db/pool.js';
 import {withTransaction} from "../db/client.js";
 
-const getUserByUsername = async (username) => {
-    const query = `
-        SELECT
-            user_id as id,
-            username,
-            email,
-            role,
-            password_hash as "passwordHash",
-            is_active as "isActive",
-            reputation_points as "reputationPoints",
-            badge_count as "badgeCount"
-        FROM "user"
-        WHERE username = $1
-    `;
-    
-    const result = await pool.query(
-        query,
-        [username]
-    );
-
-    return result.rows[0] || null;
-}
-
-const getUserByEmail = async (email) => {
-    const result = await pool.query(
-        'SELECT * FROM "user" WHERE email = $1',
-        [email]
-    );
-    
-    return result.rows[0] || null;
-}
-
 const registerUser = async (username, email, passwordHash) => {
     try {
         const result = await withTransaction(async (client) => {
@@ -62,6 +30,5 @@ const registerUser = async (username, email, passwordHash) => {
 
 export default {
     getUserByUsername,
-    getUserByEmail,
     registerUser
 }

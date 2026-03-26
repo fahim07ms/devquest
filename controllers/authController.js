@@ -90,7 +90,7 @@ export const login = async (req, res) => {
     
     try {
         // Check if the user exists
-        const user = await authModel.getUserByUsername(username);
+        const user = await UserModel.getUserByUsername(username);
         if (!user) {
             return sendErrorResponse(
                 res,

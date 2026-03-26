@@ -6,7 +6,7 @@ import {
     getUserDetails,
     updateUserProfile,
     getUserQuestions,
-    getUserAnswers
+    getUserAnswers, uploadProfileImage
 } from '../controllers/userController.js';
 import {validateBody} from "../middleware/validate.js";
 import {profileUpdateSchema} from "../validation/userSchemas.js";
@@ -14,7 +14,7 @@ import {profileUpdateSchema} from "../validation/userSchemas.js";
 // Authenticated routes
 router.get('/me', authMiddleware, getUserDetails);
 router.put('/me', authMiddleware, validateBody(profileUpdateSchema), updateUserProfile);
-router.put('/me/avatar', authMiddleware, updateUserProfile);
+router.put('/me/avatar', authMiddleware, uploadProfileImage);
 
 // Public routes
 router.get('/:username', getUserDetails);

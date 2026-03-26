@@ -16,7 +16,9 @@ const getUserById = async (id) => {
             p.first_name as "firstName",
             p.last_name as "lastName",
             p.bio as bio,
-            p.profile_picture as "profilePicture"
+            p.profile_picture as "profilePicture",
+            p.website as "website",
+            p.birth_date as "birthDate"
         FROM "user" u
         JOIN profile p ON u.user_id = p.user_id
         WHERE u.user_id = $1
@@ -27,6 +29,36 @@ const getUserById = async (id) => {
         [id]
     );
 
+    return result.rows[0] || null;
+}
+
+const getUserByUsername = async (username) => {
+    const query = `
+        SELECT
+            u.user_id as id,
+            username,
+            email,
+            role,
+            password_hash as "passwordHash",
+            is_active as "isActive",
+            reputation_points as "reputationPoints",
+            badge_count as "badgeCount",
+            p.first_name as "firstName",
+            p.last_name as "lastName",
+            p.bio as bio,
+            p.profile_picture as "profilePicture",
+            p.website as "website",
+            p.birth_date as "birthDate"
+        FROM "user" u
+        JOIN profile p ON u.user_id = p.user_id
+        WHERE username = $1
+    `;
+    
+    const result = await pool.query(
+        query,
+        [username]
+    );
+    
     return result.rows[0] || null;
 }
 
@@ -141,6 +173,7 @@ const getAnswersByUsername = async (username) => {
 
 export default {
     getUserById,
+    getUserByUsername,
     updateUserProfileData,
     getQuestionsByUsername,
     getAnswersByUsername,
