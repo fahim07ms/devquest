@@ -22,6 +22,7 @@ import tagRoutes from './routes/tagRoutes.js';
 import questionRoutes from "./routes/questionRoutes.js";
 import answerRoutes from "./routes/answerRoutes.js";
 import commentRoutes from "./routes/commentRoutes.js";
+import voteRoutes from "./routes/voteRoutes.js";
 
 
 // API Routes
@@ -31,6 +32,7 @@ app.use('/api/tags', tagRoutes);
 app.use('/api/questions', questionRoutes);
 app.use('/api/answers', answerRoutes);
 app.use('/api/comments', commentRoutes);
+app.use('/api/votes', voteRoutes);
 
 app.get('/health', (req, res) => res.send('OK'));
 app.get('/', (req, res) => {

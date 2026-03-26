@@ -33,34 +33,6 @@ const getUserByEmail = async (email) => {
     return result.rows[0] || null;
 }
 
-const getUserById = async (id) => {
-    const query = `
-        SELECT
-            u.user_id as id,
-            username,
-            email,
-            role,
-            password_hash as "passwordHash",
-            is_active as "isActive",
-            reputation_points as "reputationPoints",
-            badge_count as "badgeCount",
-            p.first_name as "firstName",
-            p.last_name as "lastName",
-            p.bio as bio,
-            p.profile_picture as "profilePicture"
-        FROM "user" u
-        JOIN profile p ON u.user_id = p.user_id
-        WHERE u.user_id = $1
-    `;
-    
-    const result = await pool.query(
-        query,
-        [id]
-    );
-    
-    return result.rows[0] || null;
-}
-
 const registerUser = async (username, email, passwordHash) => {
     try {
         const result = await withTransaction(async (client) => {
@@ -89,7 +61,6 @@ const registerUser = async (username, email, passwordHash) => {
 }
 
 export default {
-    getUserById,
     getUserByUsername,
     getUserByEmail,
     registerUser

@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import {sendErrorResponse} from "../utils/error.js";
 import dotenv from 'dotenv';
 import authModel from "../models/authModel.js";
+import UserModel from "../models/userModel.js";
 
 dotenv.config();
 
@@ -175,7 +176,7 @@ export const refreshAccessToken = async (req, res) => {
             )
         }
         
-        const user = await authModel.getUserById(payload.userId);
+        const user = await UserModel.getUserById(payload.userId);
         if (!user) {
             return sendErrorResponse(
                 res,

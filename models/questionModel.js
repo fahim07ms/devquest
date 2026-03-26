@@ -104,6 +104,7 @@ const getQuestions = async (limit, offset, sortBy, sortOrder, tags, search, answ
     }
 }
 
+// Get question by ID with tags
 const getQuestionById = async (id) => {
     const query = `
         SELECT
@@ -157,6 +158,7 @@ const getQuestionById = async (id) => {
     return result;
 }
 
+// Create a new question with tags
 const createQuestion = async (userId, title, body, tags) => {
     const result = await withTransaction(async (client) => {
         const content = await client.query(
@@ -197,6 +199,7 @@ const createQuestion = async (userId, title, body, tags) => {
     return result || null;
 }
 
+// Update question
 const updateQuestion = async (questionId, title, body, tags, authorId) => {
     const result = await withTransaction(async (client) => {
         const updateContent = await client.query(
@@ -252,6 +255,7 @@ const deleteQuestion = async (questionId, userId) => {
     return result || null;
 }
 
+// Update view count
 const updateViewCount = async (questionId) => {
     await pool.query(
         `UPDATE question
