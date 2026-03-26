@@ -10,8 +10,6 @@ import { cn } from '@/lib/utils'
 import {
     FunnelIcon,
     PencilSimpleIcon,
-    ArrowLeftIcon,
-    ArrowRightIcon,
     XIcon,
     CheckIcon,
     MagnifyingGlassIcon,

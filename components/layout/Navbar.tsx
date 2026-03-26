@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/authStore'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { MagnifyingGlass, Moon, Sun, PencilSimple } from '@phosphor-icons/react'
+import { MagnifyingGlassIcon, MoonIcon, SunIcon, PencilSimpleIcon } from '@phosphor-icons/react'
 import { useTheme } from 'next-themes'
 
 export function Navbar() {
@@ -36,8 +36,7 @@ export function Navbar() {
             {/* Search */}
             <form onSubmit={handleSearch} className="flex-1 max-w-md">
                 <div className="relative">
-                    <MagnifyingGlass
-                        className={`absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 transition-colors duration-150 ${
+                    <MagnifyingGlassIcon className={`absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 transition-colors duration-150 ${
                             focused ? 'text-primary' : 'text-muted-foreground'
                         }`}
                     />
@@ -59,16 +58,20 @@ export function Navbar() {
 
             <div className="ml-auto flex items-center gap-1.5">
                 {/* Ask Question */}
-                {isAuthenticated && (
+                {isAuthenticated ? (
                     <Button
                         asChild
                         size="sm"
                         className="h-8 gap-1.5 hidden sm:flex text-xs px-3 shadow-none"
                     >
                         <Link href="/questions/ask">
-                            <PencilSimple weight="bold" className="h-3 w-3" />
+                            <PencilSimpleIcon weight="bold" className="h-3 w-3" />
                             Ask Question
                         </Link>
+                    </Button>
+                ) : (
+                    <Button onClick={() => (router.push('/register'))} className={`h-8 gap-1.5 hidden sm:flex text-xs px-3 shadow-none cursor-pointer`}>
+                        Join Now
                     </Button>
                 )}
 
@@ -79,9 +82,9 @@ export function Navbar() {
                     title="Toggle theme"
                 >
                     {theme === 'dark' ? (
-                        <Sun className="h-3.5 w-3.5" />
+                        <SunIcon className="h-3.5 w-3.5" />
                     ) : (
-                        <Moon className="h-3.5 w-3.5" />
+                        <MoonIcon className="h-3.5 w-3.5" />
                     )}
                 </button>
             </div>

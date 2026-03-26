@@ -15,6 +15,7 @@ import { ActionBtn } from '@/components/questions/ActionBtn'
 import { ArrowBendDownRightIcon, PencilSimpleLineIcon, TrashIcon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import TiptapEditor from '@/components/editor/TiptapEditor'
+import { VoteButtons } from '@/components/questions/VoteButtons'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -41,8 +42,6 @@ export function CommentThread({
     parentId: string
     parentType: 'question' | 'answer'
     currentUserId?: string
-    // The owner of the parent content — used as default recipient
-    // when someone adds a comment (not a reply to another comment)
     recipientId?: string
     onCommentAdded:   (parentId: string, comment: CommentType) => void
     onCommentEdited:  (commentId: string, updated: CommentType) => void
@@ -50,33 +49,24 @@ export function CommentThread({
 }) {
     const { isAuthenticated } = useAuthStore()
 
-    // Editor shown when clicking `Add a comment` or replying to a comment
     const [showEditor, setShowEditor]           = useState(false)
     const [newBody, setNewBody]                 = useState<JSONContent>({})
     const [replyPrefix, setReplyPrefix]         = useState('')
-
-    // The recipientId to attach when posting — either the reply target or the parent author
     const [activeRecipientId, setActiveRecipientId] = useState<string | undefined>(undefined)
     const [isPosting, setIsPosting]             = useState(false)
 
-    // Editing a comment
     const [editingId, setEditingId]             = useState<string | null>(null)
     const [editBody, setEditBody]               = useState<JSONContent>({})
     const [isSavingEdit, setIsSavingEdit]       = useState(false)
 
-    // Drives the AlertDialog — holds the id of the comment pending deletion
     const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
-    // Open the editor. When replying to a specific comment, wire up that
-    // comment's author as recipient. When clicking "Add a comment" use
-    // the parent content owner (recipientId prop) as the default.
     const openReply = (username?: string, commentAuthorId?: string) => {
         setReplyPrefix(username ? `@${username}` : '')
         setActiveRecipientId(commentAuthorId ?? recipientId)
         setShowEditor(true)
     }
 
-    // Create a new comment
     const handlePost = async () => {
         const empty =
             !newBody ||
@@ -109,7 +99,6 @@ export function CommentThread({
         }
     }
 
-    // Edit an existing comment
     const handleSaveEdit = async (commentId: string) => {
         const empty =
             !editBody ||
@@ -129,7 +118,6 @@ export function CommentThread({
         }
     }
 
-    // Delete a comment.
     const handleConfirmDelete = async () => {
         if (!pendingDeleteId) return
         try {
@@ -151,7 +139,7 @@ export function CommentThread({
                     {comments.map((comment, i) => {
                         const isOwn     = !!currentUserId && comment.author?.authorId === currentUserId
                         const isEditing = editingId === comment.id
-                        const recipientUsername = comment.recipient?.recipientUsername || 'anonymous'
+                        const recipientUsername = comment.recipient?.recipientUsername
 
                         return (
                             <div
@@ -178,7 +166,6 @@ export function CommentThread({
                                                 'Anonymous'}
                                         </span>
 
-                                        {/* Always render recipient when the API provides it */}
                                         {recipientUsername && (
                                             <>
                                                 <span className="text-[10px] text-muted-foreground/40">→</span>
@@ -188,7 +175,7 @@ export function CommentThread({
                                             </>
                                         )}
 
-                                        <span className="text-[10px] text-muted-foreground/50 ml-auto mr-2">
+                                        <span className="text-[10px] text-muted-foreground/50 ml-auto">
                                             {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
                                         </span>
                                     </div>
@@ -214,74 +201,79 @@ export function CommentThread({
                                         </div>
                                     )}
 
-                                    {/* Hover actions */}
+                                    {/* Actions row — votes + edit/delete/reply */}
                                     {!isEditing && (
-                                        <div className="flex items-center gap-3 mt-1 opacity-0 group-hover:opacity-100
-                                        transition-opacity duration-150">
-                                            {isAuthenticated && (
-                                                <ActionBtn
-                                                    onClick={() =>
-                                                        openReply(
-                                                            comment.author?.username,
-                                                            comment.author?.authorId
-                                                        )
-                                                    }
-                                                    icon={ArrowBendDownRightIcon}
-                                                    label="Reply"
-                                                />
-                                            )}
-                                            {isOwn && (
-                                                <>
-                                                    <ActionBtn
-                                                        onClick={() => {
-                                                            setEditingId(comment.id)
-                                                            setEditBody(comment.body as JSONContent)
-                                                        }}
-                                                        icon={PencilSimpleLineIcon}
-                                                        label="Edit"
-                                                    />
+                                        <div className="flex items-center justify-between mt-1.5">
+                                            {/* Horizontal vote buttons — always visible */}
+                                            <VoteButtons
+                                                score={comment.voteScore ?? 0}
+                                                contentId={comment.id}
+                                                orientation="horizontal"
+                                                className="opacity-60 group-hover:opacity-100 transition-opacity duration-150"
+                                            />
 
-                                                    {/* AlertDialog-driven delete */}
-                                                    <AlertDialog
-                                                        open={pendingDeleteId === comment.id}
-                                                        onOpenChange={(open) => {
-                                                            if (!open) setPendingDeleteId(null)
-                                                        }}
-                                                    >
-                                                        <AlertDialogTrigger asChild>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setPendingDeleteId(comment.id)}
-                                                                className="inline-flex items-center gap-1 text-xs
-                                                                text-muted-foreground hover:text-destructive
-                                                                transition-colors duration-150"
-                                                            >
-                                                                <TrashIcon className="h-3.5 w-3.5" />
-                                                                Delete
-                                                            </button>
-                                                        </AlertDialogTrigger>
-                                                        <AlertDialogContent>
-                                                            <AlertDialogHeader>
-                                                                <AlertDialogTitle>Delete comment?</AlertDialogTitle>
-                                                                <AlertDialogDescription>
-                                                                    This comment will be permanently removed and cannot
-                                                                    be recovered.
-                                                                </AlertDialogDescription>
-                                                            </AlertDialogHeader>
-                                                            <AlertDialogFooter>
-                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                <AlertDialogAction
-                                                                    onClick={handleConfirmDelete}
-                                                                    className="bg-destructive text-destructive-foreground
-                                                                    hover:bg-destructive/90"
+                                            {/* Reply / edit / delete — appear on hover */}
+                                            <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                                                {isAuthenticated && (
+                                                    <ActionBtn
+                                                        onClick={() =>
+                                                            openReply(
+                                                                comment.author?.username,
+                                                                comment.author?.authorId
+                                                            )
+                                                        }
+                                                        icon={ArrowBendDownRightIcon}
+                                                        label="Reply"
+                                                    />
+                                                )}
+                                                {isOwn && (
+                                                    <>
+                                                        <ActionBtn
+                                                            onClick={() => {
+                                                                setEditingId(comment.id)
+                                                                setEditBody(comment.body as JSONContent)
+                                                            }}
+                                                            icon={PencilSimpleLineIcon}
+                                                            label="Edit"
+                                                        />
+
+                                                        <AlertDialog
+                                                            open={pendingDeleteId === comment.id}
+                                                            onOpenChange={(open) => {
+                                                                if (!open) setPendingDeleteId(null)
+                                                            }}
+                                                        >
+                                                            <AlertDialogTrigger asChild>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setPendingDeleteId(comment.id)}
+                                                                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors duration-150"
                                                                 >
+                                                                    <TrashIcon className="h-3.5 w-3.5" />
                                                                     Delete
-                                                                </AlertDialogAction>
-                                                            </AlertDialogFooter>
-                                                        </AlertDialogContent>
-                                                    </AlertDialog>
-                                                </>
-                                            )}
+                                                                </button>
+                                                            </AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader>
+                                                                    <AlertDialogTitle>Delete comment?</AlertDialogTitle>
+                                                                    <AlertDialogDescription>
+                                                                        This comment will be permanently removed and cannot be recovered.
+                                                                    </AlertDialogDescription>
+                                                                </AlertDialogHeader>
+                                                                <AlertDialogFooter>
+                                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                    <AlertDialogAction
+                                                                        onClick={handleConfirmDelete}
+                                                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                                    >
+                                                                        Delete
+                                                                    </AlertDialogAction>
+                                                                </AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                        </AlertDialog>
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -291,7 +283,7 @@ export function CommentThread({
                 </div>
             )}
 
-            {/* ── Editor ── */}
+            {/* ── New comment / reply editor ── */}
             {!showEditor ? (
                 isAuthenticated && (
                     <button
@@ -317,7 +309,8 @@ export function CommentThread({
                         )}
                         <div className="flex items-center gap-2 ml-auto">
                             <Button
-                                variant="ghost" size="sm"
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => {
                                     setShowEditor(false)
                                     setReplyPrefix('')

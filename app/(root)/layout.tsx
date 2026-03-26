@@ -26,7 +26,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 console.log('Authentication failed:', error);
                 // If verification fails, logout and redirect to login
                 logout();
-                router.push('/login');
             } finally {
                 setIsLoading(false);
             }
