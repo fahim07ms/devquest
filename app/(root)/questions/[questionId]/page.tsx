@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import {
     ArrowLeftIcon, ClockClockwiseIcon, PencilSimpleLineIcon,
-    EyeIcon, CheckCircleIcon, TrashIcon, ArrowBendDownRightIcon,
+    EyeIcon, CheckCircleIcon, TrashIcon, ArrowBendDownRightIcon, LockKeyIcon
 } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'
@@ -139,6 +139,18 @@ export default function QuestionDetailPage() {
     const currentUserId     = user?.id
     const isQuestionAuthor  = !!(question && user?.username === question.author?.username)
     const hasAcceptedAnswer = answers.some(a => a.isAccepted)
+    const isModerator       = user?.role === 'admin' || user?.role === 'moderator'
+
+    const handleUnfreezeQuestion = async () => {
+        if (!question) return;
+        try {
+            await api.patch(`/flags/content/${question.id}/unfreeze`);
+            setQuestion({ ...question, isFrozen: false });
+            toast.success('Question unfrozen.');
+        } catch {
+            toast.error('Failed to unfreeze question.');
+        }
+    };
 
     if (isLoading) {
         return (
@@ -185,6 +197,25 @@ export default function QuestionDetailPage() {
                 )}
             </div>
 
+            {question.isFrozen && (
+                <div className="mb-7 px-4 py-3 bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 flex flex-wrap items-center justify-between gap-4 w-full">
+                    <div className="flex items-center gap-2.5 text-sm font-medium">
+                        <LockKeyIcon className="h-5 w-5 shrink-0" weight="fill" />
+                        This question has been frozen by a moderator and is hidden from the public.
+                    </div>
+                    {isModerator && (
+                        <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={handleUnfreezeQuestion} 
+                            className="h-8 border-amber-500/30 hover:bg-amber-500/20 text-amber-700 dark:hover:text-amber-300 dark:text-amber-400 shrink-0 shadow-none bg-transparent"
+                        >
+                            Unfreeze Content
+                        </Button>
+                    )}
+                </div>
+            )}
+
             <div className="h-px bg-border/50 mb-7" />
 
             {/* ── Question body ── */}
@@ -222,14 +253,14 @@ export default function QuestionDetailPage() {
                                             />
                                         </>
                                     )}
+                                    {/* Flag — shown to authenticated non-owners, next to edit/delete */}
+                                    {isAuthenticated && !isOwn && (
+                                        <FlagButton
+                                            variant="inline"
+                                            onClick={() => setFlagDialogOpen(true)}
+                                        />
+                                    )}
                                 </div>
-                                {/* Flag — authenticated non-owners only */}
-                                {isAuthenticated && !isOwn && (
-                                    <FlagButton
-                                        variant="inline"
-                                        onClick={() => setFlagDialogOpen(true)}
-                                    />
-                                )}
                                 <div className="ml-auto flex items-center gap-2.5 bg-primary/5 border border-primary/10 px-3 py-2.5">
                                     <p className="text-[10px] text-muted-foreground/70 leading-none">
                                         asked {new Date(question.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}

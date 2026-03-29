@@ -14,8 +14,12 @@ interface FlagRowProps {
         status: string
         createdAt: string
         reporter?: { username: string }
-        moderator?: { username: string } | null,
+        moderator?: { username: string } | null
         contentType: 'question' | 'answer' | 'comment'
+        // For answer flags, the backend returns the parent question's ID so we
+        // can build the correct deep-link to the answer on the question page.
+        questionId?: string | null
+        suggestedDuplicateId?: string | null
     }
     onReview: (flag: FlagRowProps['flag']) => void
 }
@@ -45,14 +49,24 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export function FlagRow({ flag, onReview }: FlagRowProps) {
 
+    // Build the URL that takes the moderator directly to the flagged content.
+    // Answers and comments need the parent question's ID — supplied by the backend.
     const getContentPath = () => {
         if (flag.contentType === 'question') {
             return `/questions/${flag.contentId}`
-        } else if (flag.contentType === 'answer') {
-            return `/questions/${flag.contentId}#answer-${flag.contentId}`
         }
 
-        return `/questions/${flag.contentId}#comment-${flag.contentId}`
+        // For answers/comments we need the parent question ID.
+        // If it's somehow missing, fall back to the content ID as a best-effort.
+        const baseQuestionId = flag.questionId ?? flag.contentId
+
+        if (flag.contentType === 'answer') {
+            return `/questions/${baseQuestionId}#answer-${flag.contentId}`
+        }
+
+        // Comments can live under a question or an answer; the parent question
+        // ID gives us the right page — the anchor scrolls to the specific comment.
+        return `/questions/${baseQuestionId}#comment-${flag.contentId}`
     }
 
     return (
@@ -75,6 +89,10 @@ export function FlagRow({ flag, onReview }: FlagRowProps) {
                         )}
                     >
                         {STATUS_LABELS[flag.status] ?? flag.status}
+                    </span>
+                    {/* Content type pill so moderators know what they're looking at */}
+                    <span className="text-[10px] font-semibold tracking-wider uppercase text-muted-foreground/50 bg-muted/30 px-1.5 py-0.5 border border-border/30">
+                        {flag.contentType}
                     </span>
                 </div>
 
@@ -109,6 +127,16 @@ export function FlagRow({ flag, onReview }: FlagRowProps) {
                         View content
                         <ArrowSquareOutIcon className="h-3 w-3" />
                     </Link>
+                    {flag.suggestedDuplicateId && (
+                        <Link
+                            href={`/questions/${flag.suggestedDuplicateId}`}
+                            className="inline-flex items-center gap-0.5 hover:text-amber-600 transition-colors text-amber-600/80"
+                            target="_blank"
+                        >
+                            View duplicate target
+                            <ArrowSquareOutIcon className="h-3 w-3" />
+                        </Link>
+                    )}
                 </div>
             </div>
 

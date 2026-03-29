@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { VoteButtons } from '@/components/questions/VoteButtons'
-import { CheckCircleIcon, PencilSimpleLineIcon, TrashIcon } from '@phosphor-icons/react'
+import { CheckCircleIcon, PencilSimpleLineIcon, TrashIcon, LockKeyIcon } from '@phosphor-icons/react'
 import { InlineEditFooter } from '@/components/questions/InlineEditFooter'
 import { TiptapContent } from '@/components/editor/TiptapContent'
 import { ActionBtn } from '@/components/questions/ActionBtn'
@@ -55,8 +55,9 @@ export function AnswerCard({
     onCommentEdited:  (commentId: string, updated: CommentType) => void
     onCommentDeleted: (commentId: string) => void
 }) {
-    const { isAuthenticated } = useAuthStore();
+    const { isAuthenticated, user } = useAuthStore();
     const isOwn = !!currentUserId && answer.author?.authorId === currentUserId;
+    const isModerator = user?.role === 'admin' || user?.role === 'moderator';
 
     const [isEditing, setIsEditing]         = useState(false)
     const [editBody, setEditBody]           = useState<JSONContent>({})
@@ -110,6 +111,16 @@ export function AnswerCard({
         }
     }
 
+    const handleUnfreezeAnswer = async () => {
+        try {
+            await api.patch(`/flags/content/${answer.id}/unfreeze`)
+            onEdited(answer.id, { ...answer, isFrozen: false })
+            toast.success('Answer unfrozen.')
+        } catch {
+            toast.error('Failed to unfreeze answer.')
+        }
+    }
+
     // Show accept button only when: question author AND (no accepted answer yet OR this one is accepted)
     const showAcceptBtn = isQuestionAuthor && (!hasAcceptedAnswer || answer.isAccepted)
 
@@ -156,6 +167,23 @@ export function AnswerCard({
 
             {/* ── Body ── */}
             <div className="flex-1 min-w-0">
+                {answer.isFrozen && (
+                    <div className="mb-4 px-3 py-2.5 bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-xs font-medium">
+                            <LockKeyIcon className="h-4 w-4 shrink-0" weight="fill" />
+                            Frozen by a moderator and hidden from the public.
+                        </div>
+                        {isModerator && (
+                            <button 
+                                onClick={handleUnfreezeAnswer}
+                                className="text-[10px] uppercase tracking-wider font-bold px-2 py-1 border border-amber-500/30 hover:bg-amber-500/20 text-amber-700 transition-colors"
+                            >
+                                Unfreeze
+                            </button>
+                        )}
+                    </div>
+                )}
+
                 {isEditing ? (
                     <>
                         <TiptapEditor

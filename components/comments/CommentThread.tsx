@@ -12,7 +12,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { InlineEditFooter } from '@/components/questions/InlineEditFooter'
 import { TiptapContent } from '@/components/editor/TiptapContent'
 import { ActionBtn } from '@/components/questions/ActionBtn'
-import { ArrowBendDownRightIcon, PencilSimpleLineIcon, TrashIcon } from '@phosphor-icons/react'
+import { ArrowBendDownRightIcon, PencilSimpleLineIcon, TrashIcon, LockKeyIcon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import TiptapEditor from '@/components/editor/TiptapEditor'
 import { VoteButtons } from '@/components/questions/VoteButtons'
@@ -49,7 +49,8 @@ export function CommentThread({
     onCommentEdited:  (commentId: string, updated: CommentType) => void
     onCommentDeleted: (commentId: string) => void
 }) {
-    const { isAuthenticated } = useAuthStore()
+    const { isAuthenticated, user } = useAuthStore()
+    const isModerator = user?.role === 'admin' || user?.role === 'moderator'
 
     const [showEditor, setShowEditor]           = useState(false)
     const [newBody, setNewBody]                 = useState<JSONContent>({})
@@ -137,6 +138,19 @@ export function CommentThread({
         }
     }
 
+    const handleUnfreezeComment = async (commentId: string) => {
+        try {
+            await api.patch(`/flags/content/${commentId}/unfreeze`)
+            const commentToUpdate = comments.find(c => c.id === commentId)
+            if (commentToUpdate) {
+                onCommentEdited(commentId, { ...commentToUpdate, isFrozen: false })
+            }
+            toast.success('Comment unfrozen.')
+        } catch {
+            toast.error('Failed to unfreeze comment.')
+        }
+    }
+
     return (
         <div className="mt-3">
             {/* ── Comment list ── */}
@@ -150,11 +164,11 @@ export function CommentThread({
                         return (
                             <div
                                 key={comment.id}
+                                id={`comment-${comment.id}`}
                                 className={cn(
                                     'group flex gap-2.5 py-2.5',
                                     i < comments.length - 1 && 'border-b border-border/25'
                                 )}
-                                id={`comment-${comment.id}`}
                             >
                                 <UserAvatar
                                     author={comment.author}
@@ -186,6 +200,23 @@ export function CommentThread({
                                             {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
                                         </span>
                                     </div>
+
+                                    {comment.isFrozen && (
+                                        <div className="mb-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 flex flex-wrap items-center justify-between gap-3">
+                                            <div className="flex items-center gap-2 text-[11px] font-medium">
+                                                <LockKeyIcon className="h-3.5 w-3.5 shrink-0" weight="fill" />
+                                                Frozen by moderator.
+                                            </div>
+                                            {isModerator && (
+                                                <button 
+                                                    onClick={() => handleUnfreezeComment(comment.id)}
+                                                    className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 border border-amber-500/30 hover:bg-amber-500/20 text-amber-700 transition-colors"
+                                                >
+                                                    Unfreeze
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
 
                                     {/* Body */}
                                     {isEditing ? (

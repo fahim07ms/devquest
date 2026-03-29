@@ -23,6 +23,7 @@ export interface Question {
     lastActivityAt: string;
     createdAt: string;
     updatedAt: string;
+    isFrozen: boolean;
     author: Author;
     tags: Tag[];
 }
@@ -36,6 +37,7 @@ export interface Answer {
     acceptedAt: string | null;
     createdAt: string;
     updatedAt: string;
+    isFrozen: boolean;
     author: Author;
 }
 
@@ -52,6 +54,7 @@ export interface Comment {
     voteScore: number;
     createdAt: string;
     updatedAt: string;
+    isFrozen: boolean;
     author: Author;
     recipient: Recipient;
 }

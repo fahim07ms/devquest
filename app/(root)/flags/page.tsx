@@ -22,6 +22,11 @@ interface Flag {
     createdAt: string
     reporter?: { username: string }
     moderator?: { username: string } | null
+    suggestedDuplicateId?: string | null
+    // Returned by the backend: needed for linking to the flagged content
+    contentType: 'question' | 'answer' | 'comment'
+    // Populated only for answer flags (the parent question ID)
+    questionId?: string | null
 }
 
 export default function FlagsPage() {

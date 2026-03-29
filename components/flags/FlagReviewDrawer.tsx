@@ -35,6 +35,9 @@ interface Flag {
     createdAt: string
     reporter?: { username: string }
     moderator?: { username: string } | null
+    suggestedDuplicateId?: string | null
+    contentType: 'question' | 'answer' | 'comment'
+    questionId?: string | null
 }
 
 interface FlagReviewDrawerProps {
