@@ -117,7 +117,8 @@ const updateAnswer = async (answerId, body, authorId) => {
             [answerId]
         );
         
-        return updateContent.rows[0];
+        return updateContent.rows[0]
+            ;
     });
     
     if (!result) return null;

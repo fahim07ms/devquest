@@ -13,12 +13,12 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 const REFRESH_SECRET = process.env.REFRESH_SECRET;
 const REFRESH_EXPIRES_IN = process.env.REFRESH_EXPIRES_IN || '30d';
 
-const generateAccessToken = (userId) => {
-    return jwt.sign({ userId }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+const generateAccessToken = (userId, role) => {
+    return jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
 
-const generateRefreshToken = (userId) => {
-    return jwt.sign({ userId }, REFRESH_SECRET, { expiresIn: REFRESH_EXPIRES_IN });
+const generateRefreshToken = (userId, role) => {
+    return jwt.sign({ userId, role }, REFRESH_SECRET, { expiresIn: REFRESH_EXPIRES_IN });
 }
 
 const accessCookieOption = {
@@ -109,8 +109,8 @@ export const login = async (req, res) => {
             );
         }
         
-        const accessToken = generateAccessToken(user.id);
-        const refreshToken = generateRefreshToken(user.id);
+        const accessToken = generateAccessToken(user.id, user.role);
+        const refreshToken = generateRefreshToken(user.id, user.role);
         
         res.cookie('accessToken', accessToken, accessCookieOption);
         res.cookie('refreshToken', refreshToken, refreshCookieOption);

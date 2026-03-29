@@ -29,6 +29,5 @@ const registerUser = async (username, email, passwordHash) => {
 }
 
 export default {
-    getUserByUsername,
     registerUser
 }

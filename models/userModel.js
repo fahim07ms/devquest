@@ -9,7 +9,6 @@ const getUserById = async (id) => {
             username,
             email,
             role,
-            password_hash as "passwordHash",
             is_active as "isActive",
             reputation_points as "reputationPoints",
             badge_count as "badgeCount",
@@ -18,7 +17,8 @@ const getUserById = async (id) => {
             p.bio as bio,
             p.profile_picture as "profilePicture",
             p.website as "website",
-            p.birth_date as "birthDate"
+            p.birth_date as "birthDate",
+            u.created_at as "createdAt"
         FROM "user" u
         JOIN profile p ON u.user_id = p.user_id
         WHERE u.user_id = $1
@@ -37,18 +37,17 @@ const getUserByUsername = async (username) => {
         SELECT
             u.user_id as id,
             username,
-            email,
             role,
-            password_hash as "passwordHash",
-            is_active as "isActive",
             reputation_points as "reputationPoints",
             badge_count as "badgeCount",
+            password_hash as "passwordHash",
             p.first_name as "firstName",
             p.last_name as "lastName",
             p.bio as bio,
             p.profile_picture as "profilePicture",
             p.website as "website",
-            p.birth_date as "birthDate"
+            p.birth_date as "birthDate",
+            u.created_at as "createdAt"
         FROM "user" u
         JOIN profile p ON u.user_id = p.user_id
         WHERE username = $1
@@ -133,11 +132,18 @@ const getQuestionsByUsername = async (username) => {
             q.answer_count as "answerCount",
             q.view_count as "viewCount",
             q.last_activity_at as "lastActivityAt",
-            q.is_answered as "isAnswered"
+            q.is_answered as "isAnswered",
+            (
+                SELECT ARRAY_AGG(jsonb_build_object('tag_id', t.tag_id, 'name', t.name))
+                FROM question_tag qt
+                JOIN tag t ON qt.tag_id = t.tag_id
+                WHERE qt.question_id = q.content_id
+            ) AS tags
         FROM question q
             JOIN content c ON c.content_id = q.content_id
-            JOIN "user" u ON username = $1
-        WHERE c.author_id = u.user_id;
+            JOIN "user" u ON u.user_id = c.author_id
+        WHERE u.username = $1
+        ORDER BY c.created_at DESC
     `;
     
     try {
@@ -152,14 +158,19 @@ const getQuestionsByUsername = async (username) => {
 const getAnswersByUsername = async (username) => {
     const query = `
         SELECT
-            a.content_id as id,
+            a.content_id  as id,
+            a.question_id as "questionId",
+            q.title as "questionTitle",
             c.vote_score as "voteScore",
             c.created_at as "createdAt",
             c.updated_at as "updatedAt",
             a.is_accepted as "isAccepted"
         FROM answer a
-            JOIN content c ON c.content_id = a.content_id
-        WHERE c.author_id = (SELECT user_id FROM "user" WHERE username = $1);
+                 JOIN content c ON c.content_id = a.content_id
+                 JOIN question q ON q.content_id = a.question_id
+                 JOIN "user" u ON u.user_id = c.author_id
+        WHERE u.username = $1
+        ORDER BY c.created_at DESC
     `;
     
     try {

@@ -20,6 +20,7 @@ export default function authMiddleware(req, res, next) {
         
         const payload = jwt.verify(token, JWT_SECRET);
         req.userId = payload.userId;
+        req.role = payload.role;
         
         return next();
     } catch (e) {
@@ -31,3 +32,11 @@ export default function authMiddleware(req, res, next) {
         )
     }
 }
+
+// only moderators and admins can access moderation routes
+export const moderatorMiddleware = (req, res, next) => {
+    if (!req.role || !['moderator', 'admin'].includes(req.role)) {
+        return res.status(403).json({ message: 'Moderator access required.' });
+    }
+    next();
+};

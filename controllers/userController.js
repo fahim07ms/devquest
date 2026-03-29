@@ -1,17 +1,10 @@
 import {sendErrorResponse} from "../utils/error.js";
 import UserModel from "../models/userModel.js";
-import cloudinary from "../config/cloudinary";
+import cloudinary from "../config/cloudinary.js";
 
 export const getUserDetails = async (req, res) => {
-    const { username } = req.params;
-    let user = null;
-    
     try {
-        if (username) {
-            user = await UserModel.getUserByUsername(username);
-        } else {
-            user = await UserModel.getUserById(req.userId);
-        }
+        const user = await UserModel.getUserById(req.userId);
         
         if (!user) {
             return sendErrorResponse(
@@ -37,7 +30,40 @@ export const getUserDetails = async (req, res) => {
     }
 }
 
-export const updateUserProfile = async (req, res) => {
+// Get Public Profile
+export const getPublicProfile = async (req, res) => {
+    const { username } = req.params;
+    
+    try {
+        const user = await UserModel.getUserByUsername(username);
+        
+        if (!user) {
+            return sendErrorResponse(
+                res,
+                  404,
+                "User not found."
+            )
+        }
+        
+        const { passwordHash, ...publicProfile } = user;
+        
+        return res.status(200).json({
+            data: {
+                user: publicProfile,
+            },
+            message: "Public profile retrieved successfully."
+        });
+    } catch (e) {
+        if (process.env.NODE_ENV === 'development') console.log(e);
+        return sendErrorResponse(
+            res,
+            500,
+            "Internal server error."
+        )
+    }
+}
+
+export const  updateUserProfile = async (req, res) => {
     const userId = req.userId;
     const {
         firstName, lastName, birthDate, bio, website

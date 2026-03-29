@@ -1,6 +1,7 @@
 import pool from "../db/pool.js";
 import { withTransaction } from "../db/client.js";
 
+// Vote on a content
 const vote = async (contentId, userId, voteType) => {
     const query = `
         INSERT INTO vote (content_id, user_id, vote_type)
@@ -23,6 +24,7 @@ const vote = async (contentId, userId, voteType) => {
     return result || null;
 }
 
+// Get votes for a content
 const getVoteForContent = async (contentId) => {
     const query = `
         SELECT
@@ -43,6 +45,7 @@ const getVoteForContent = async (contentId) => {
     return result.rows;
 }
 
+// Update vote
 const updateVote = async (voteId, voteType) => {
     const query = `
         UPDATE vote
@@ -71,6 +74,7 @@ const updateVote = async (voteId, voteType) => {
     return result || null;
 };
 
+// Delete a vote
 const deleteVote = async (voteId, userId) => {
     const query = `
         DELETE FROM vote
