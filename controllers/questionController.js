@@ -26,6 +26,7 @@ export const getQuestions = async (req, res) => {
     const orderValue = order === 'asc' ? 'ASC' : 'DESC';
     const searchValue = search || '';
     const tags = req.query.tags ? req.query.tags.split(',') : [];
+    const bypassFreeze = req.role === 'admin' || req.role === 'moderator';
     
     try {
         const { questions, totalQuestions, currentPage, totalPages } = await QuestionModel.getQuestions(
@@ -35,7 +36,8 @@ export const getQuestions = async (req, res) => {
             orderValue,
             tags,
             searchValue,
-            answered
+            answered,
+            bypassFreeze
         );
         
         return res.status(200).json({
@@ -62,9 +64,10 @@ export const getQuestions = async (req, res) => {
 // Get a single question by ID
 export const getQuestionById = async (req, res) => {
     const { questionId } = req.params;
+    const bypassFreeze = req.role === 'admin' || req.role === 'moderator';
     
     try {
-        const question = await QuestionModel.getQuestionById(questionId);
+        const question = await QuestionModel.getQuestionById(questionId, bypassFreeze);
         
         if (!question) {
             return sendErrorResponse(

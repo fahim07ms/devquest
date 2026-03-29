@@ -1,7 +1,9 @@
 import pool from '../db/pool.js';
 import { withTransaction } from '../db/client.js';
 
-const getAnswersByQuestionId = async (questionId) => {
+const getAnswersByQuestionId = async (questionId, bypassFreeze = false) => {
+    const freezeFilter = bypassFreeze ? '' : 'AND c.is_frozen = FALSE';
+    
     const query = `
         SELECT
             a.content_id as id,
@@ -9,6 +11,7 @@ const getAnswersByQuestionId = async (questionId) => {
             a.accepted_at as "acceptedAt",
             c.body,
             c.vote_score as "voteScore",
+            c.is_frozen as "isFrozen",
             c.created_at as "createdAt",
             c.updated_at as "updatedAt",
             jsonb_build_object(
@@ -22,7 +25,7 @@ const getAnswersByQuestionId = async (questionId) => {
         JOIN content c ON a.content_id = c.content_id
         JOIN profile p ON c.author_id = p.user_id
         LEFT JOIN "user" u ON c.author_id = u.user_id
-        WHERE a.question_id = $1
+        WHERE a.question_id = $1 ${freezeFilter}
         ORDER BY
             a.is_accepted DESC,
             c.vote_score DESC,
@@ -37,7 +40,9 @@ const getAnswersByQuestionId = async (questionId) => {
     return result.rows;
 };
 
-const getAnswerById = async (answerId) => {
+const getAnswerById = async (answerId, bypassFreeze = false) => {
+    const freezeFilter = bypassFreeze ? '' : 'AND c.is_frozen = FALSE';
+    
     const query = `
         SELECT
             a.content_id as id,
@@ -46,6 +51,7 @@ const getAnswerById = async (answerId) => {
             a.accepted_at as "acceptedAt",
             c.body,
             c.vote_score as "voteScore",
+            c.is_frozen as "isFrozen",
             c.created_at as "createdAt",
             c.updated_at as "updatedAt",
             jsonb_build_object(
@@ -59,7 +65,7 @@ const getAnswerById = async (answerId) => {
         JOIN content c ON a.content_id = c.content_id
         LEFT JOIN profile p ON c.author_id = p.user_id
         LEFT JOIN "user" u ON c.author_id = u.user_id
-        WHERE a.content_id = $1
+        WHERE a.content_id = $1 ${freezeFilter}
     `;
     const result = await pool.query(
         query,

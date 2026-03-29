@@ -1,7 +1,14 @@
 import pool from '../db/pool.js';
 import { withTransaction } from '../db/client.js';
 
-// Shared select columns
+// Shared select columns used across all flag queries.
+//
+// To correctly build deep-links for every content type we need the parent
+// question ID:
+//   • question  → f.content_id itself
+//   • answer    → answer.question_id (via LEFT JOIN answer)
+//   • comment   → comment.parent_id may point to a question OR an answer;
+//                 COALESCE(cm_ans.question_id, cm.parent_id) handles both.
 const FLAG_SELECT = `
     f.flag_id as id,
     f.content_id as "contentId",
@@ -12,6 +19,14 @@ const FLAG_SELECT = `
     f.suggested_duplicate_id as "suggestedDuplicateId",
     f.created_at as "createdAt",
     f.updated_at as "updatedAt",
+    c.is_frozen as "isFrozen",
+    -- Resolve the parent question ID regardless of content type so the
+    -- frontend can build the correct deep-link every time.
+    CASE
+        WHEN c.content_type = 'question' THEN f.content_id
+        WHEN c.content_type = 'answer'   THEN ans.question_id
+        WHEN c.content_type = 'comment'  THEN COALESCE(cm_ans.question_id, cm.parent_id)
+    END AS "questionId",
     jsonb_build_object(
         'userId',   reporter.user_id,
         'username', reporter.username
@@ -23,6 +38,21 @@ const FLAG_SELECT = `
             'username', moderator.username
         )
     END AS "moderator"
+`;
+
+// The FROM + JOIN block that every flag SELECT reuses.
+// LEFT JOIN answer   → resolves question_id for answer-type flags
+// LEFT JOIN comment  → gives us parent_id for comment-type flags
+// LEFT JOIN answer cm_ans → resolves the comment's parent to a question when the
+//                           parent is an answer rather than a question directly
+const FLAG_JOINS = `
+    FROM flag f
+    LEFT JOIN content c         ON c.content_id     = f.content_id
+    LEFT JOIN answer  ans       ON ans.content_id   = f.content_id
+    LEFT JOIN comment cm        ON cm.content_id    = f.content_id
+    LEFT JOIN answer  cm_ans    ON cm_ans.content_id = cm.parent_id
+    LEFT JOIN "user" reporter   ON f.user_id        = reporter.user_id
+    LEFT JOIN "user" moderator  ON f.moderator_id   = moderator.user_id
 `;
 
 // Create a flag
@@ -58,10 +88,7 @@ const getFlagById = async (flagId) => {
     const query = `
         SELECT ${FLAG_SELECT},
         c.content_type as "contentType"
-        FROM flag f
-        LEFT JOIN content c ON c.content_id = f.content_id
-        LEFT JOIN "user" reporter  ON f.user_id      = reporter.user_id
-        LEFT JOIN "user" moderator ON f.moderator_id = moderator.user_id
+        ${FLAG_JOINS}
         WHERE f.flag_id = $1
     `;
     
@@ -69,25 +96,28 @@ const getFlagById = async (flagId) => {
     return result.rows[0] || null;
 };
 
-// Get all flags (moderator view) with optional status filter
-const getAllFlags = async ({ status, limit, offset }) => {
+// Get all flags (moderator view) with optional status & category filters
+const getAllFlags = async ({ status, category, limit, offset }) => {
     let paramCount = 1;
     const params   = [];
-    let whereClause = '';
+    const conditions = [];
     
     if (status) {
-        whereClause = `WHERE f.status = $${paramCount}`;
+        conditions.push(`f.status = $${paramCount++}`);
         params.push(status);
-        paramCount++;
     }
+    
+    if (category) {
+        conditions.push(`f.flag_category = $${paramCount++}`);
+        params.push(category);
+    }
+    
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
     
     const query = `
         SELECT ${FLAG_SELECT},
         c.content_type as "contentType"
-        FROM flag f
-        LEFT JOIN content c ON c.content_id = f.content_id
-        LEFT JOIN "user" reporter  ON f.user_id      = reporter.user_id
-        LEFT JOIN "user" moderator ON f.moderator_id = moderator.user_id
+        ${FLAG_JOINS}
         ${whereClause}
         ORDER BY f.created_at DESC
         LIMIT $${paramCount} OFFSET $${paramCount + 1}
@@ -95,12 +125,12 @@ const getAllFlags = async ({ status, limit, offset }) => {
     
     params.push(limit, offset);
     
+    // Build count params without limit/offset
+    const countParams = conditions.length > 0 ? params.slice(0, -2) : [];
+    
     const [flagsResult, countResult] = await Promise.all([
         pool.query(query, params),
-        pool.query(
-            `SELECT COUNT(*) FROM flag f ${whereClause}`,
-            status ? [status] : []
-        ),
+        pool.query(`SELECT COUNT(*) FROM flag f ${whereClause}`, countParams),
     ]);
     
     return {
@@ -113,9 +143,7 @@ const getAllFlags = async ({ status, limit, offset }) => {
 const getFlagsByContentId = async (contentId) => {
     const query = `
         SELECT ${FLAG_SELECT}
-        FROM flag f
-        LEFT JOIN "user" reporter  ON f.user_id      = reporter.user_id
-        LEFT JOIN "user" moderator ON f.moderator_id = moderator.user_id
+        ${FLAG_JOINS}
         WHERE f.content_id = $1
         ORDER BY f.created_at DESC
     `;
@@ -124,7 +152,9 @@ const getFlagsByContentId = async (contentId) => {
     return result.rows;
 };
 
-// Moderator reviews a flag (updates status + optional note)
+// Moderator reviews a flag: updates status + optional note.
+// When status is 'action_taken', the flagged content is frozen so it is no
+// longer accessible to regular users.
 const reviewFlag = async (flagId, moderatorId, { status, moderatorNote }) => {
     const result = await withTransaction(async (client) => {
         const updateResult = await client.query(
@@ -132,9 +162,10 @@ const reviewFlag = async (flagId, moderatorId, { status, moderatorNote }) => {
              SET
                 status         = $1,
                 moderator_id   = $2,
-                moderator_note = $3
+                moderator_note = $3,
+                updated_at     = NOW()
              WHERE flag_id = $4
-             RETURNING flag_id`,
+             RETURNING flag_id, content_id`,
             [status, moderatorId, moderatorNote ?? null, flagId]
         );
         
@@ -142,14 +173,43 @@ const reviewFlag = async (flagId, moderatorId, { status, moderatorNote }) => {
             throw new Error('NOT_FOUND');
         }
         
-        return updateResult.rows[0];
+        const { flag_id, content_id } = updateResult.rows[0];
+        
+        // Freeze the content when the moderator decides to take action.
+        // This hides it from all public-facing queries immediately.
+        if (status === 'action_taken') {
+            await client.query(
+                `UPDATE content SET is_frozen = TRUE WHERE content_id = $1`,
+                [content_id]
+            );
+        }
+        
+        // If the moderator reverses to a non-action status, unfreeze the content
+        // so the community can see it again.
+        if (status !== 'action_taken') {
+            await client.query(
+                `UPDATE content SET is_frozen = FALSE WHERE content_id = $1`,
+                [content_id]
+            );
+        }
+        
+        return { flag_id };
     });
     
     if (!result) return null;
     return getFlagById(result.flag_id);
 };
 
-// Delete a flag
+// Explicitly unfreeze a piece of content (moderator action — separate from flag review)
+const unfreezeContent = async (contentId) => {
+    const result = await pool.query(
+        `UPDATE content SET is_frozen = FALSE WHERE content_id = $1 RETURNING content_id`,
+        [contentId]
+    );
+    return result.rows[0] || null;
+};
+
+// Delete a flag (does NOT unfreeze the content — use unfreezeContent for that)
 const deleteFlag = async (flagId) => {
     const result = await withTransaction(async (client) => {
         const deleteResult = await client.query(
@@ -173,5 +233,6 @@ export default {
     getAllFlags,
     getFlagsByContentId,
     reviewFlag,
+    unfreezeContent,
     deleteFlag,
 };

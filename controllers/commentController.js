@@ -10,9 +10,10 @@ export const getCommentsByParentId = async (req, res) => {
     const { commentId } = req.params;
     
     const parentId = answerId || questionId || commentId;
+    const bypassFreeze = req.role === 'admin' || req.role === 'moderator';
     
     try {
-        const comments = await CommentModel.getCommentsByParentId(parentId);
+        const comments = await CommentModel.getCommentsByParentId(parentId, bypassFreeze);
         
         return res.status(200).json({
             data: {
@@ -34,9 +35,10 @@ export const getCommentsByParentId = async (req, res) => {
 // Get single comment by ID
 export const getCommentById = async (req, res) => {
     const { commentId } = req.params;
+    const bypassFreeze = req.role === 'admin' || req.role === 'moderator';
     
     try {
-        const comment = await CommentModel.getCommentById(commentId);
+        const comment = await CommentModel.getCommentById(commentId, bypassFreeze);
         
         if (!comment) {
             return sendErrorResponse(

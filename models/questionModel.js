@@ -3,8 +3,12 @@ import pool from "../db/pool.js";
 
 // Get all questions with pagination, sorting, filtering and search
 // Probable filters: tags, creation date, last activity date, unanswered, highest score
-const getQuestions = async (limit, offset, sortBy, sortOrder, tags, search, answered) => {
+const getQuestions = async (limit, offset, sortBy, sortOrder, tags, search, answered, bypassFreeze = false) => {
     // Initialize query with basic columns and joins
+    
+    // Moderators can bypass the freeze filter to view frozen content in listings
+    const freezeFilter = bypassFreeze ? '' : 'AND c.is_frozen = FALSE';
+    
     let initQuery = `
             SELECT
                 c.content_id as "id",
@@ -16,6 +20,7 @@ const getQuestions = async (limit, offset, sortBy, sortOrder, tags, search, answ
                 c.vote_score as "voteScore",
                 c.created_at as "createdAt",
                 c.updated_at as "updatedAt",
+                c.is_frozen as "isFrozen",
                 jsonb_build_object(
                     'authorId', c.author_id,
                     'username', u.username,
@@ -39,11 +44,14 @@ const getQuestions = async (limit, offset, sortBy, sortOrder, tags, search, answ
             LEFT JOIN profile p ON c.author_id = p.user_id
             LEFT JOIN "user" u ON c.author_id = u.user_id
             WHERE q.title ILIKE ('%' || $1 || '%')
+            ${freezeFilter}
         `;
     
     let totalQuestionsQuery = `
         SELECT COUNT(*) FROM question q
+        JOIN content c ON q.content_id = c.content_id
         WHERE q.title ILIKE ('%' || $1 || '%')
+        ${freezeFilter}
     `;
     let params = [search];
     let paramCount = 2;
@@ -104,8 +112,10 @@ const getQuestions = async (limit, offset, sortBy, sortOrder, tags, search, answ
     }
 }
 
-// Get question by ID with tags
-const getQuestionById = async (id) => {
+// Get question by ID — returns null if the question doesn't exist or has been frozen
+const getQuestionById = async (id, bypassFreeze = false) => {
+    const freezeFilter = bypassFreeze ? '' : 'AND c.is_frozen = FALSE';
+    
     const query = `
         SELECT
             q.content_id as "id",
@@ -117,6 +127,7 @@ const getQuestionById = async (id) => {
             c.vote_score as "voteScore",
             c.created_at as "createdAt",
             c.updated_at as "updatedAt",
+            c.is_frozen as "isFrozen",
             jsonb_build_object(
                 'authorId', c.author_id,
                 'username', u.username,
@@ -129,7 +140,7 @@ const getQuestionById = async (id) => {
             LEFT JOIN content c ON q.content_id = c.content_id
             LEFT JOIN profile p ON c.author_id = p.user_id
             LEFT JOIN "user" u ON c.author_id = u.user_id
-        WHERE q.content_id = $1
+        WHERE q.content_id = $1 ${freezeFilter}
     `;
     
     const result = await withTransaction(async (client) => {

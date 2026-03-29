@@ -6,5 +6,5 @@ export const commentSchema = z.object({
         type: z.literal('doc'),
         content: z.array(z.any()).optional(),
     }),
-    recipientId: z.uuid().optional(),
+    recipientId: z.guid().optional(),
 });

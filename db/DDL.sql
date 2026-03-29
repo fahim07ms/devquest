@@ -178,6 +178,8 @@ CREATE TABLE IF NOT EXISTS "content" (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMPTZ,
     vote_score INTEGER NOT NULL DEFAULT 0,
+    -- Moderator freeze flag: set to TRUE when a flag is resolved with 'action_taken'
+    is_frozen BOOLEAN NOT NULL DEFAULT FALSE,
 
     -- Constraints
     CONSTRAINT fk_author FOREIGN KEY(author_id) REFERENCES "user"(user_id) ON DELETE SET NULL,
@@ -374,3 +376,7 @@ ALTER TABLE comment
 DROP COLUMN depth_level;
 ALTER TABLE comment
 ADD COLUMN recipient_id UUID REFERENCES "user"(user_id) ON DELETE SET NULL;
+
+-- Add moderator freeze flag to existing content rows (idempotent)
+ALTER TABLE content
+ADD COLUMN IF NOT EXISTS is_frozen BOOLEAN NOT NULL DEFAULT FALSE;

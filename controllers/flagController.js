@@ -47,9 +47,9 @@ export const createFlag = async (req, res) => {
     }
 };
 
-// Moderator/admin only — list all flags with an optional status filter
+// Moderator/admin only — list all flags with optional status & category filters
 export const getAllFlags = async (req, res) => {
-    let { page, limit, status } = req.query;
+    let { page, limit, status, category } = req.query;
     
     if (isNaN(page) || page <= 0) page = 1;
     if (isNaN(limit) || limit <= 0) limit = 20;
@@ -59,8 +59,9 @@ export const getAllFlags = async (req, res) => {
     
     try {
         const { flags, totalFlags } = await FlagModel.getAllFlags({
-            status: status || null,
-            limit:  limitValue,
+            status:   status   || null,
+            category: category || null,
+            limit:    limitValue,
             offset,
         });
         
@@ -143,7 +144,9 @@ export const getFlagsByContentId = async (req, res) => {
     }
 };
 
-// Moderator/admin only — update flag status and optionally add a note
+// Moderator/admin only — update flag status and optionally add a note.
+// Changing from 'action_taken' to another status will automatically unfreeze
+// the associated content (handled inside flagModel.reviewFlag).
 export const reviewFlag = async (req, res) => {
     const { flagId }   = req.params;
     const moderatorId  = req.userId;
@@ -157,15 +160,6 @@ export const reviewFlag = async (req, res) => {
                 res,
                 404,
                 'Flag not found.'
-            );
-        }
-        
-        // A flag that has already been acted upon should not be re-reviewed
-        if (flag.status === 'action_taken') {
-            return sendErrorResponse(
-                res,
-                409,
-                'This flag has already been acted upon and cannot be updated.'
             );
         }
         
@@ -245,6 +239,35 @@ export const deleteFlag = async (req, res) => {
                 'Flag not found.'
             );
         }
+        
+        return sendErrorResponse(
+            res,
+            500,
+            'Internal Server Error'
+        );
+    }
+};
+
+// Moderator/admin only — explicitly unfreeze a piece of content
+export const unfreezeContent = async (req, res) => {
+    const { contentId } = req.params;
+    
+    try {
+        const result = await FlagModel.unfreezeContent(contentId);
+        
+        if (!result) {
+            return sendErrorResponse(
+                res,
+                404,
+                'Content not found.'
+            );
+        }
+        
+        return res.status(200).json({
+            message: 'Content unfrozen successfully.',
+        });
+    } catch (error) {
+        if (process.env.NODE_ENV === 'development') console.log(error);
         
         return sendErrorResponse(
             res,

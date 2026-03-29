@@ -33,10 +33,29 @@ export default function authMiddleware(req, res, next) {
     }
 }
 
-// only moderators and admins can access moderation routes
 export const moderatorMiddleware = (req, res, next) => {
     if (!req.role || !['moderator', 'admin'].includes(req.role)) {
-        return res.status(403).json({ message: 'Moderator access required.' });
+        return sendErrorResponse(
+            res,
+            403,
+            "Moderator access required."
+        );
     }
     next();
 };
+
+// optionalAuthMiddleware attempts to decode the token to populate
+// req.userId and req.role, but does NOT return 401 if it's missing or invalid.
+export function optionalAuthMiddleware(req, res, next) {
+    try {
+        const token = req.cookies.accessToken;
+        if (token) {
+            const payload = jwt.verify(token, JWT_SECRET);
+            req.userId = payload.userId;
+            req.role = payload.role;
+        }
+    } catch (e) {
+        // Silently ignore invalid tokens for optional auth
+    }
+    return next();
+}

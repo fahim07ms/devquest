@@ -1,13 +1,16 @@
-import pool from '../db/pool.js';
-import { withTransaction } from '../db/client.js';
+import { withTransaction } from "../db/client.js";
+import pool from "../db/pool.js";
 
-const getCommentsByParentId = async (parentId) => {
+const getCommentsByParentId = async (parentId, bypassFreeze = false) => {
+    const freezeFilter = bypassFreeze ? '' : 'AND c.is_frozen = FALSE';
+    
     const query = `
         SELECT
             cm.parent_id as "parentId",
             cm.content_id as "id",
             c.body,
             c.vote_score as "voteScore",
+            c.is_frozen as "isFrozen",
             c.author_id as "authorId",
             c.created_at as "createdAt",
             c.updated_at as "updatedAt",
@@ -27,7 +30,7 @@ const getCommentsByParentId = async (parentId) => {
         LEFT JOIN profile p ON c.author_id = p.user_id
         LEFT JOIN "user" u ON c.author_id = u.user_id
         LEFT JOIN "user" r ON cm.recipient_id = r.user_id
-        WHERE cm.parent_id = $1
+        WHERE cm.parent_id = $1 ${freezeFilter}
         ORDER BY c.created_at
     `;
     const result = await pool.query(
@@ -38,13 +41,16 @@ const getCommentsByParentId = async (parentId) => {
     return result.rows;
 };
 
-const getCommentById = async (commentId) => {
+const getCommentById = async (commentId, bypassFreeze = false) => {
+    const freezeFilter = bypassFreeze ? '' : 'AND c.is_frozen = FALSE';
+    
     const query = `
         SELECT
             cm.content_id as "id",
             cm.parent_id as "parentId",
             c.body,
             c.vote_score as "voteScore",
+            c.is_frozen as "isFrozen",
             c.created_at as "createdAt",
             c.updated_at as "updatedAt",
             jsonb_build_object(
@@ -63,7 +69,7 @@ const getCommentById = async (commentId) => {
         LEFT JOIN profile p ON c.author_id = p.user_id
         LEFT JOIN "user" u ON c.author_id = u.user_id
         LEFT JOIN "user" r ON cm.recipient_id = r.user_id
-        WHERE cm.content_id = $1
+        WHERE cm.content_id = $1 ${freezeFilter}
     `;
     const result = await pool.query(
         query,

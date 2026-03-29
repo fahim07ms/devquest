@@ -4,8 +4,10 @@ const FLAG_CATEGORIES = ['spam', 'offensive', 'duplicate', 'low_quality', 'off_t
 const FLAG_STATUSES   = ['pending', 'reviewed', 'rejected', 'action_taken'];
 
 export const createFlagSchema = z.object({
-    contentId: z.uuid('Content ID must be a valid UUID.'),
-    reason: z.string('Reason is required.').trim()
+    contentId: z.guid('Content ID must be a valid UUID.'),
+    // Reason is always sent by the frontend — for non-"other" categories the
+    // frontend auto-fills "Flagged as <category>" so this is never truly empty.
+    reason: z.string().trim()
         .min(1,   'Reason cannot be empty.')
         .max(100, 'Reason must be 100 characters or fewer.'),
     flagCategory: z
@@ -14,7 +16,7 @@ export const createFlagSchema = z.object({
         })
         .default('other'),
     suggestedDuplicateId: z
-        .uuid('Suggested duplicate ID must be a valid UUID.')
+        .guid('Suggested duplicate ID must be a valid UUID.')
         .nullable()
         .optional(),
 }).refine(

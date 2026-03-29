@@ -1,5 +1,5 @@
 import express from 'express';
-import authMiddleware from "../middleware/authMiddleware.js";
+import authMiddleware, { optionalAuthMiddleware, moderatorMiddleware } from "../middleware/authMiddleware.js";
 const router = express.Router();
 
 import {
@@ -20,11 +20,11 @@ import {createComment, getCommentsByParentId} from "../controllers/commentContro
 import {answerSchema} from "../validation/answerSchema.js";
 import {commentSchema} from "../validation/commentSchema.js";
 
-// Public routes
-router.get('/', getQuestions);
-router.get('/:questionId', getQuestionById);
-router.get('/:questionId/answers', getAnswersByQuestionId);
-router.get('/:questionId/comments', getCommentsByParentId);
+// Public routes (with optional auth to detect moderators for bypass of frozen content filter)
+router.get('/', optionalAuthMiddleware, getQuestions);
+router.get('/:questionId', optionalAuthMiddleware, getQuestionById);
+router.get('/:questionId/answers', optionalAuthMiddleware, getAnswersByQuestionId);
+router.get('/:questionId/comments', optionalAuthMiddleware, getCommentsByParentId);
 
 // Authenticated routes
 router.post('/', authMiddleware, validateBody(questionSchema), createQuestion);

@@ -5,9 +5,10 @@ import { sendErrorResponse } from '../utils/error.js';
 // Get all answers for a question
 export const getAnswersByQuestionId = async (req, res) => {
     const { questionId } = req.params;
+    const bypassFreeze = req.role === 'admin' || req.role === 'moderator';
     
     try {
-        const question = await QuestionModel.getQuestionById(questionId);
+        const question = await QuestionModel.getQuestionById(questionId, bypassFreeze);
         
         if (!question) {
             return sendErrorResponse(
@@ -17,7 +18,7 @@ export const getAnswersByQuestionId = async (req, res) => {
             );
         }
         
-        const answers = await AnswerModel.getAnswersByQuestionId(questionId);
+        const answers = await AnswerModel.getAnswersByQuestionId(questionId, bypassFreeze);
         
         return res.status(200).json({
             data: {
@@ -34,9 +35,10 @@ export const getAnswersByQuestionId = async (req, res) => {
 // Get a single answer by ID
 export const getAnswerById = async (req, res) => {
     const { answerId } = req.params;
+    const bypassFreeze = req.role === 'admin' || req.role === 'moderator';
     
     try {
-        const answer = await AnswerModel.getAnswerById(answerId);
+        const answer = await AnswerModel.getAnswerById(answerId, bypassFreeze);
         
         if (!answer) {
             return sendErrorResponse(
