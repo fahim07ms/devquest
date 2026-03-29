@@ -24,11 +24,14 @@ import { ActionBtn } from "@/components/questions/ActionBtn";
 import { InlineEditFooter } from "@/components/questions/InlineEditFooter";
 import { CommentThread } from "@/components/comments/CommentThread";
 import { AnswerCard } from "@/components/answers/AnswerCard";
+import {FlagButton} from "@/components/flags/FlagButton";
+import {FlagDialog} from "@/components/flags/FlagDialog";
 
 export default function QuestionDetailPage() {
     const params = useParams();
     const questionId = params.questionId as string;
     const { isAuthenticated, user } = useAuthStore();
+    const [isOwn, setIsOwn] = useState(false)
 
     // State
     const [question, setQuestion]           = useState<Question | null>(null)
@@ -41,6 +44,8 @@ export default function QuestionDetailPage() {
     const [isSavingQuestion, setIsSavingQuestion]   = useState(false)
     const [newAnswerBody, setNewAnswerBody]           = useState<JSONContent>({})
     const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false)
+    const [flagDialogOpen, setFlagDialogOpen] = useState(false);
+
 
     useEffect(() => { setMounted(true) }, [])
 
@@ -59,6 +64,8 @@ export default function QuestionDetailPage() {
                 const qData: Question      = qRes.data.data.question
                 const aData: Answer[]      = aRes.data.data.answers
                 const qComments: CommentType[] = cRes.data.data.comments
+
+                setIsOwn(!!currentUserId && qData.author?.authorId === currentUserId);
 
                 setQuestion(qData); setAnswers(aData)
 
@@ -129,7 +136,6 @@ export default function QuestionDetailPage() {
             ...a, isAccepted: a.id === answerId ? accepted : (accepted ? false : a.isAccepted)
         }))), [])
 
-    console.log(question)
     const currentUserId     = user?.id
     const isQuestionAuthor  = !!(question && user?.username === question.author?.username)
     const hasAcceptedAnswer = answers.some(a => a.isAccepted)
@@ -186,6 +192,7 @@ export default function QuestionDetailPage() {
                 <div className="flex-shrink-0 w-9 flex flex-col items-center pt-0.5">
                     <VoteButtons score={question.voteScore} contentId={question.id} />
                 </div>
+
                 <div className="flex-1 min-w-0">
                     {isEditingQuestion ? (
                         <>
@@ -216,6 +223,13 @@ export default function QuestionDetailPage() {
                                         </>
                                     )}
                                 </div>
+                                {/* Flag — authenticated non-owners only */}
+                                {isAuthenticated && !isOwn && (
+                                    <FlagButton
+                                        variant="inline"
+                                        onClick={() => setFlagDialogOpen(true)}
+                                    />
+                                )}
                                 <div className="ml-auto flex items-center gap-2.5 bg-primary/5 border border-primary/10 px-3 py-2.5">
                                     <p className="text-[10px] text-muted-foreground/70 leading-none">
                                         asked {new Date(question.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -296,6 +310,13 @@ export default function QuestionDetailPage() {
                 @keyframes fade-up { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
                 .animate-fade-up { animation: fade-up 0.4s cubic-bezier(0.22,1,0.36,1) both; }
             `}</style>
+
+            <FlagDialog
+                open={flagDialogOpen}
+                onOpenChange={setFlagDialogOpen}
+                contentId={questionId}
+                contentType="question"
+            />
         </div>
     )
 }

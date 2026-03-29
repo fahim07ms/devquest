@@ -27,6 +27,8 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import {FlagButton} from "@/components/flags/FlagButton";
+import {FlagDialog} from "@/components/flags/FlagDialog";
 
 export function CommentThread({
                                   comments,
@@ -59,7 +61,11 @@ export function CommentThread({
     const [editBody, setEditBody]               = useState<JSONContent>({})
     const [isSavingEdit, setIsSavingEdit]       = useState(false)
 
-    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+    // Track which comment is pending deletion
+    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+    // Track which comment has the flag dialog open
+    const [flaggingCommentId, setFlaggingCommentId] = useState<string | null>(null);
 
     const openReply = (username?: string, commentAuthorId?: string) => {
         setReplyPrefix(username ? `@${username}` : '')
@@ -148,6 +154,7 @@ export function CommentThread({
                                     'group flex gap-2.5 py-2.5',
                                     i < comments.length - 1 && 'border-b border-border/25'
                                 )}
+                                id={`comment-${comment.id}`}
                             >
                                 <UserAvatar
                                     author={comment.author}
@@ -226,7 +233,7 @@ export function CommentThread({
                                                         label="Reply"
                                                     />
                                                 )}
-                                                {isOwn && (
+                                                {isOwn ? (
                                                     <>
                                                         <ActionBtn
                                                             onClick={() => {
@@ -272,6 +279,14 @@ export function CommentThread({
                                                             </AlertDialogContent>
                                                         </AlertDialog>
                                                     </>
+                                                ) : (
+                                                    /* Flag — authenticated non-owners only */
+                                                    isAuthenticated && (
+                                                        <FlagButton
+                                                            variant="inline"
+                                                            onClick={() => setFlaggingCommentId(comment.id)}
+                                                        />
+                                                    )
                                                 )}
                                             </div>
                                         </div>
@@ -282,6 +297,19 @@ export function CommentThread({
                     })}
                 </div>
             )}
+
+            {/* Flag dialogs — one per comment, controlled by flaggingCommentId */}
+            {comments.map((comment) => (
+                <FlagDialog
+                    key={`flag-${comment.id}`}
+                    open={flaggingCommentId === comment.id}
+                    onOpenChange={(open) => {
+                        if (!open) setFlaggingCommentId(null)
+                    }}
+                    contentId={comment.id}
+                    contentType="comment"
+                />
+            ))}
 
             {/* ── New comment / reply editor ── */}
             {!showEditor ? (

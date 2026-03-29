@@ -26,6 +26,9 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import {FlagDialog} from "@/components/flags/FlagDialog";
+import {FlagButton} from "@/components/flags/FlagButton";
+import {useAuthStore} from "@/store/authStore";
 
 export function AnswerCard({
                                answer,
@@ -52,13 +55,15 @@ export function AnswerCard({
     onCommentEdited:  (commentId: string, updated: CommentType) => void
     onCommentDeleted: (commentId: string) => void
 }) {
-    const isOwn = !!currentUserId && answer.author?.authorId === currentUserId
+    const { isAuthenticated } = useAuthStore();
+    const isOwn = !!currentUserId && answer.author?.authorId === currentUserId;
 
     const [isEditing, setIsEditing]         = useState(false)
     const [editBody, setEditBody]           = useState<JSONContent>({})
     const [isSaving, setIsSaving]           = useState(false)
     const [isAccepting, setIsAccepting]     = useState(false)
-    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [flagDialogOpen, setFlagDialogOpen] = useState(false);
 
     const handleSave = async () => {
         const empty =
@@ -114,6 +119,7 @@ export function AnswerCard({
                 'group/answer relative flex gap-5 py-7 border-b border-border/40 last:border-0',
                 answer.isAccepted && 'bg-emerald-500/[0.03] px-2'
             )}
+            id={`answer-${answer.id}`}
         >
             {answer.isAccepted && (
                 <div className="absolute left-0 top-6 bottom-6 w-0.5 bg-emerald-500/50" />
@@ -220,6 +226,14 @@ export function AnswerCard({
                                         </AlertDialog>
                                     </>
                                 )}
+
+                                {/* Flag — authenticated non-owners only */}
+                                {isAuthenticated && !isOwn && (
+                                    <FlagButton
+                                        variant="inline"
+                                        onClick={() => setFlagDialogOpen(true)}
+                                    />
+                                )}
                             </div>
 
                             <div className="flex items-center gap-2.5 bg-muted/30 border border-border/40 px-3 py-2">
@@ -242,6 +256,13 @@ export function AnswerCard({
                                 onCommentDeleted={onCommentDeleted}
                             />
                         </div>
+
+                        <FlagDialog
+                            open={flagDialogOpen}
+                            onOpenChange={setFlagDialogOpen}
+                            contentId={answer.id}
+                            contentType="answer"
+                        />
                     </>
                 )}
             </div>

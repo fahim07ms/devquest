@@ -177,19 +177,21 @@ export function AppSidebar() {
             <SidebarFooter className="p-3">
                 <div className="h-px bg-border/50 mb-3" />
                 {isAuthenticated ? (
-                    <div className="flex items-center gap-3 rounded-xl px-3 py-2.5 bg-muted/30 hover:bg-muted/50 transition-colors duration-150">
-                        <Avatar className="h-8 w-8 ring-2 ring-primary/15 flex-shrink-0">
-                            <AvatarImage src={user?.profilePicture || ''} alt={user?.username} />
-                            <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
-                                {initials}
-                            </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold truncate leading-tight">{user?.username}</p>
-                            <p className="text-xs text-muted-foreground truncate leading-tight mt-0.5">
-                                {user?.firstName} {user?.lastName}
-                            </p>
-                        </div>
+                    <div className="flex items-center justify-between rounded-xl px-3 py-2.5 bg-muted/30 hover:bg-muted/50 transition-colors duration-150">
+                        <Link href={`/users/${user?.username}`} className={`flex items-center text-sm font-medium transition-colors duration-150`}>
+                            <Avatar className="h-8 w-8 ring-2 ring-primary/15 flex-shrink-0">
+                                <AvatarImage src={user?.profilePicture || ''} alt={user?.username} />
+                                <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
+                                    {initials}
+                                </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold truncate leading-tight">{user?.username}</p>
+                                <p className="text-xs text-muted-foreground truncate leading-tight mt-0.5">
+                                    {user?.firstName} {user?.lastName}
+                                </p>
+                            </div>
+                        </Link>
                         <button
                             onClick={handleLogout}
                             className="text-muted-foreground/60 hover:text-destructive transition-colors duration-150 rounded-md p-1.5 hover:bg-destructive/10 flex-shrink-0"
