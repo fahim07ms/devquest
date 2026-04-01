@@ -15,7 +15,8 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import {
     ArrowLeftIcon, ClockClockwiseIcon, PencilSimpleLineIcon,
-    EyeIcon, CheckCircleIcon, TrashIcon, ArrowBendDownRightIcon, LockKeyIcon
+    EyeIcon, CheckCircleIcon, TrashIcon, ArrowBendDownRightIcon, LockKeyIcon,
+    BookmarkSimple
 } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'
@@ -45,6 +46,9 @@ export default function QuestionDetailPage() {
     const [newAnswerBody, setNewAnswerBody]           = useState<JSONContent>({})
     const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false)
     const [flagDialogOpen, setFlagDialogOpen] = useState(false);
+    
+    const [isBookmarked, setIsBookmarked]   = useState(false)
+    const [isTogglingBookmark, setIsTogglingBookmark] = useState(false)
 
 
     useEffect(() => { setMounted(true) }, [])
@@ -52,6 +56,16 @@ export default function QuestionDetailPage() {
     // Fetch data
     useEffect(() => {
         if (!questionId) return
+
+        // Prevent double-counting in development (React strict mode)
+        // and avoid inflating views when the user refreshes the page manually
+        const viewedKey = `viewed_qn_${questionId}`
+        if (!sessionStorage.getItem(viewedKey)) {
+            sessionStorage.setItem(viewedKey, 'true')
+            // Fire view count endpoint silently
+            api.post(`/questions/${questionId}/view`).catch(() => {})
+        }
+
         const fetchAll = async () => {
             setIsLoading(true)
             try {
@@ -78,6 +92,13 @@ export default function QuestionDetailPage() {
 
                 // Map comments to comments
                 setCommentsMap(map)
+
+                // If authenticated, get bookmark status
+                if (useAuthStore.getState().isAuthenticated) {
+                    api.get(`/bookmarks/${questionId}/status`)
+                        .then(res => setIsBookmarked(res.data.data.isBookmarked))
+                        .catch(() => {})
+                }
             } catch { toast.error('Failed to load question.') }
             finally { setIsLoading(false) }
         }
@@ -125,6 +146,26 @@ export default function QuestionDetailPage() {
         finally { setIsSubmittingAnswer(false) }
     }
 
+    const handleToggleBookmark = async () => {
+        if (!isAuthenticated) return toast.error('Please log in to bookmark.');
+        setIsTogglingBookmark(true);
+        try {
+            if (isBookmarked) {
+                await api.delete(`/bookmarks/${questionId}`);
+                setIsBookmarked(false);
+                toast.success('Bookmark removed.');
+            } else {
+                await api.post(`/bookmarks/${questionId}`);
+                setIsBookmarked(true);
+                toast.success('Question bookmarked.');
+            }
+        } catch {
+            toast.error('Failed to update bookmark.');
+        } finally {
+            setIsTogglingBookmark(false);
+        }
+    };
+
     const handleAnswerEdited  = useCallback((id: string, updated: Answer) =>
         setAnswers(prev => prev.map(a => a.id === id ? updated : a)), [])
 
@@ -135,6 +176,19 @@ export default function QuestionDetailPage() {
         setAnswers(prev => prev.map(a => ({
             ...a, isAccepted: a.id === answerId ? accepted : (accepted ? false : a.isAccepted)
         }))), [])
+
+    const handleAwardBounty = async (answerId: string) => {
+        if (!question?.activeBounty) return;
+        if (!confirm('Are you sure you want to award the bounty to this answer? This cannot be undone.')) return;
+        
+        try {
+            await api.patch(`/bounties/${question.activeBounty.id}/award`, { answerId });
+            toast.success('Bounty awarded successfully!');
+            setQuestion(prev => prev ? { ...prev, activeBounty: null } : null);
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || 'Failed to award bounty.');
+        }
+    };
 
     const currentUserId     = user?.id
     const isQuestionAuthor  = !!(question && user?.username === question.author?.username)
@@ -216,6 +270,17 @@ export default function QuestionDetailPage() {
                 </div>
             )}
 
+            {question.activeBounty && (
+                <div className="mb-7 px-4 py-3 bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-400 flex flex-wrap items-center justify-between gap-4 w-full">
+                    <div className="flex items-center gap-2.5 text-sm font-medium">
+                        <div className="bg-blue-500 text-white font-bold px-2 py-0.5 rounded text-xs shrink-0">
+                            +{question.activeBounty.amount}
+                        </div>
+                        This question has an active bounty expiring {formatDistanceToNow(new Date(question.activeBounty.expiresAt), { addSuffix: true })}.
+                    </div>
+                </div>
+            )}
+
             <div className="h-px bg-border/50 mb-7" />
 
             {/* ── Question body ── */}
@@ -240,6 +305,11 @@ export default function QuestionDetailPage() {
                         <>
                             <div className="flex items-end justify-between flex-wrap gap-4">
                                 <div className="flex items-center gap-3">
+                                    <ActionBtn
+                                        onClick={handleToggleBookmark}
+                                        icon={(props) => <BookmarkSimple {...props} weight={isBookmarked ? "fill" : "regular"} className={cn(props.className, isBookmarked && "text-primary")} />}
+                                        label={isBookmarked ? 'Saved' : 'Save'}
+                                    />
                                     {isQuestionAuthor && (
                                         <>
                                             <ActionBtn onClick={() => { setQuestionEditBody(question.body as JSONContent); setIsEditingQuestion(true) }} icon={PencilSimpleLineIcon} label="Edit" />
@@ -303,6 +373,8 @@ export default function QuestionDetailPage() {
                                     answer={answer} isQuestionAuthor={isQuestionAuthor}
                                     hasAcceptedAnswer={hasAcceptedAnswer} currentUserId={currentUserId}
                                     comments={commentsMap[answer.id] || []}
+                                    canAwardBounty={!!question.activeBounty && isQuestionAuthor}
+                                    onAwardBounty={handleAwardBounty}
                                     onAccept={handleAccept} onEdited={handleAnswerEdited} onDeleted={handleAnswerDeleted}
                                     onCommentAdded={handleCommentAdded} onCommentEdited={handleCommentEdited} onCommentDeleted={handleCommentDeleted}
                                 />

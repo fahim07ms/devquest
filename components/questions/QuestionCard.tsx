@@ -80,7 +80,11 @@ export function QuestionCard({ question, className }: QuestionCardProps) {
                     <span className="text-[10px] mt-0.5">views</span>
                 </div>
 
-                {/*TODO: Add Bounty Badge*/}
+                {question.activeBounty && (
+                    <div className="mt-1 flex items-center justify-center bg-blue-500 text-white rounded px-1.5 py-0.5 text-xs font-bold shadow-sm">
+                        +{question.activeBounty.amount}
+                    </div>
+                )}
             </div>
 
             {/* ── Main content ── */}

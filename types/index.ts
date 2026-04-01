@@ -24,6 +24,11 @@ export interface Question {
     createdAt: string;
     updatedAt: string;
     isFrozen: boolean;
+    activeBounty?: {
+        id: string;
+        amount: number;
+        expiresAt: string;
+    } | null;
     author: Author;
     tags: Tag[];
 }

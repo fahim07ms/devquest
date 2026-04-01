@@ -42,12 +42,16 @@ export function AnswerCard({
                                onCommentAdded,
                                onCommentEdited,
                                onCommentDeleted,
+                               canAwardBounty,
+                               onAwardBounty,
                            }: {
     answer: Answer
     isQuestionAuthor: boolean
     hasAcceptedAnswer: boolean
     currentUserId?: string
     comments: CommentType[]
+    canAwardBounty?: boolean
+    onAwardBounty?: (answerId: string) => void
     onAccept:         (answerId: string, accepted: boolean) => void
     onEdited:         (answerId: string, updated: Answer) => void
     onDeleted:        (answerId: string) => void
@@ -163,6 +167,17 @@ export function AnswerCard({
                         <CheckCircleIcon weight="fill" className="h-5 w-5" />
                     </div>
                 ) : null}
+
+                {canAwardBounty && !answer.isAccepted && (
+                    <button
+                        type="button"
+                        onClick={() => onAwardBounty?.(answer.id)}
+                        title="Award active bounty to this answer"
+                        className="p-1 px-[5px] mt-2 transition-colors duration-150 bg-blue-500/10 text-blue-700 dark:text-blue-400 hover:bg-blue-500 hover:text-white dark:hover:text-white rounded text-[10px] font-bold text-center leading-tight whitespace-normal"
+                    >
+                        Award Bounty
+                    </button>
+                )}
             </div>
 
             {/* ── Body ── */}

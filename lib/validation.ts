@@ -39,6 +39,21 @@ export const askFormSchema = z.object({
             name: z.string(),
         })
     ).max(5),
-})
+    bountyAmount: z.preprocess(
+        (val) => (val === '' || Number.isNaN(Number(val)) ? undefined : Number(val)),
+        z.number().min(50, 'Minimum bounty is 50.').optional()
+    ),
+    bountyReason: z.string().optional().nullable()
+}).superRefine((data, ctx) => {
+    if (data.bountyAmount && data.bountyAmount > 0) {
+        if (!data.bountyReason || data.bountyReason.trim().length === 0) {
+            ctx.addIssue({
+                code: 'custom',
+                message: "A reason is required when offering a bounty.",
+                path: ["bountyReason"]
+            })
+        }
+    }
+});
 
 export type AskFormValues = z.infer<typeof askFormSchema>

@@ -36,12 +36,14 @@ export default function AskQuestionPage() {
         handleSubmit,
         watch,
         formState: { errors, isSubmitting },
-    } = useForm<AskFormValues>({
+    } = useForm({
         resolver: zodResolver(askFormSchema),
         defaultValues: {
             title: '',
             body: {},
             tags: [],
+            bountyAmount: undefined,
+            bountyReason: ''
         },
     })
 
@@ -83,6 +85,20 @@ export default function AskQuestionPage() {
                 body: values.body,
                 tags: values.tags,
             })
+            
+            // If bounty is specified, attach it
+            if (values.bountyAmount && values.bountyAmount > 0 && values.bountyReason) {
+                try {
+                    await api.post(`/questions/${question.id}/bounties`, {
+                        amount: values.bountyAmount,
+                        reason: values.bountyReason,
+                    })
+                    toast.success('Bounty attached successfully.')
+                } catch (bountyErr: any) {
+                    toast.error(bountyErr.response?.data?.message || 'Failed to attach bounty. You can add it later.')
+                }
+            }
+
             toast.success('Question posted.')
             router.push(`/questions/${question.id}`)
         } catch {
@@ -208,7 +224,7 @@ export default function AskQuestionPage() {
                                 />
                                 {errors.body && (
                                     <p className="text-xs text-destructive/80">
-                                        {errors.body.message}
+                                        {errors.body.message as string}
                                     </p>
                                 )}
                             </div>
@@ -240,15 +256,40 @@ export default function AskQuestionPage() {
                     />
                 </Section>
 
-                {/* Bounty placeholder */}
+                {/* Bounty (Optional) */}
                 <Section
-                    step="04 — Bounty"
-                    hint="Bounties attract more attention and reward great answers. You can add one after posting."
+                    step="04 — Bounty (Optional)"
+                    hint="Bounties attract more attention and reward great answers. It will be deducted from your reputation."
                 >
-                    <div className="flex items-center gap-3 px-4 py-3 border border-dashed border-border/50 bg-muted/10">
-                        <p className="text-xs text-muted-foreground">
-                            Bounty offering will be available once the question is posted.
-                        </p>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                        <div className="w-full sm:w-1/3">
+                            <label className="text-xs font-semibold text-foreground/80 mb-1.5 block">Amount (rep)</label>
+                            <Input
+                                type="number"
+                                {...register('bountyAmount')}
+                                placeholder="e.g. 50"
+                                className={cn(
+                                    'h-10 text-sm border-border/60 rounded-none',
+                                    'focus:border-primary/50 focus:ring-2 focus:ring-primary/10',
+                                    errors.bountyAmount && 'border-destructive/50'
+                                )}
+                            />
+                            {errors.bountyAmount && <p className="text-xs text-destructive/80 mt-1">{errors.bountyAmount.message as string}</p>}
+                        </div>
+                        <div className="w-full sm:w-2/3">
+                            <label className="text-xs font-semibold text-foreground/80 mb-1.5 block">Reason</label>
+                            <Input
+                                type="text"
+                                {...register('bountyReason')}
+                                placeholder="e.g. Needs a detailed canonical answer"
+                                className={cn(
+                                    'h-10 text-sm border-border/60 rounded-none',
+                                    'focus:border-primary/50 focus:ring-2 focus:ring-primary/10',
+                                    errors.bountyReason && 'border-destructive/50'
+                                )}
+                            />
+                            {errors.bountyReason && <p className="text-xs text-destructive/80 mt-1">{errors.bountyReason.message as string}</p>}
+                        </div>
                     </div>
                 </Section>
 
