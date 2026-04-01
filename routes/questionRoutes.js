@@ -26,6 +26,9 @@ router.get('/:questionId', optionalAuthMiddleware, getQuestionById);
 router.get('/:questionId/answers', optionalAuthMiddleware, getAnswersByQuestionId);
 router.get('/:questionId/comments', optionalAuthMiddleware, getCommentsByParentId);
 
+// View count route (accessible to everyone)
+router.post('/:questionId/view', updateQuestionViewCount);
+
 // Authenticated routes
 router.post('/', authMiddleware, validateBody(questionSchema), createQuestion);
 router.put('/:questionId', authMiddleware, validateBody(questionSchema), editQuestion);

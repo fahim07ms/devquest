@@ -21,6 +21,16 @@ const getQuestions = async (limit, offset, sortBy, sortOrder, tags, search, answ
                 c.created_at as "createdAt",
                 c.updated_at as "updatedAt",
                 c.is_frozen as "isFrozen",
+                (
+                    SELECT jsonb_build_object(
+                        'id', b.bounty_id,
+                        'amount', b.amount,
+                        'expiresAt', b.expires_at
+                    )
+                    FROM bounty b
+                    WHERE b.question_id = q.content_id AND b.status = 'active'
+                    LIMIT 1
+                ) as "activeBounty",
                 jsonb_build_object(
                     'authorId', c.author_id,
                     'username', u.username,
@@ -128,6 +138,16 @@ const getQuestionById = async (id, bypassFreeze = false) => {
             c.created_at as "createdAt",
             c.updated_at as "updatedAt",
             c.is_frozen as "isFrozen",
+            (
+                SELECT jsonb_build_object(
+                    'id', b.bounty_id,
+                    'amount', b.amount,
+                    'expiresAt', b.expires_at
+                )
+                FROM bounty b
+                WHERE b.question_id = q.content_id AND b.status = 'active'
+                LIMIT 1
+            ) as "activeBounty",
             jsonb_build_object(
                 'authorId', c.author_id,
                 'username', u.username,

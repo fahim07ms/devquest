@@ -24,6 +24,8 @@ import answerRoutes from "./routes/answerRoutes.js";
 import commentRoutes from "./routes/commentRoutes.js";
 import voteRoutes from "./routes/voteRoutes.js";
 import flagRoutes from "./routes/flagRoutes.js";
+import bookmarkRoutes from "./routes/bookmarkRoutes.js";
+import bountyRoutes from "./routes/bountyRoutes.js";
 
 import { getFlagsByContentId } from './controllers/flagController.js';
 import authMiddleware, { moderatorMiddleware }from "./middleware/authMiddleware.js";
@@ -38,6 +40,10 @@ app.use('/api/answers', answerRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/votes', voteRoutes);
 app.use('/api/flags', flagRoutes);
+app.use('/api/bookmarks', bookmarkRoutes);
+
+app.use('/api/questions/:questionId/bounties', bountyRoutes);
+app.use('/api/bounties', bountyRoutes);
 
 // Getting flags on a specific content
 app.get('/api/content/:contentId/flags', authMiddleware, moderatorMiddleware, getFlagsByContentId);
