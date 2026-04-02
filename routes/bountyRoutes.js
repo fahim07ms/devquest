@@ -11,7 +11,7 @@ const router = express.Router({ mergeParams: true });
 // Mounted at /api/bounties and /api/questions/:questionId/bounties
 
 // To create
-router.post('/', authMiddleware, createBounty);
+// router.post('/', authMiddleware, createBounty);
 
 // To award (assuming we mount this at /api/bounties)
 router.patch('/:bountyId/award', authMiddleware, awardBounty);

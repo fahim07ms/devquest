@@ -863,3 +863,40 @@ SELECT u.user_id, t.tag_id FROM (VALUES
 ON CONFLICT DO NOTHING;
 
 COMMIT;
+
+BEGIN;
+
+-- ============================================================
+-- BADGE SEED DATA
+-- Run this once after your schema is set up.
+-- Criteria types must match the badge_criteria_type enum:
+--   question_count, answer_count, total_votes_received,
+--   answer_score, question_views, accepted_answer_score,
+--   helpful_flags, consecutive_days_visited, comment_count
+-- ============================================================
+
+INSERT INTO badge (name, description, badge_tier, criteria_type, criteria_threshold) VALUES
+
+-- ── QUESTION BADGES ───────────────────────────────────────────────────────────
+('Curious',          'Asked your first question.',                              'bronze', 'question_count',        1),
+('Inquisitive',      'Asked 10 questions.',                                     'silver', 'question_count',        10),
+('Socratic',         'Asked 50 questions.',                                     'gold',   'question_count',        50),
+
+-- ── ANSWER BADGES ─────────────────────────────────────────────────────────────
+('Helper',           'Posted your first answer.',                               'bronze', 'answer_count',          1),
+('Contributor',      'Posted 10 answers.',                                      'silver', 'answer_count',          10),
+('Guru',             'Posted 50 answers.',                                      'gold',   'answer_count',          50),
+
+-- ── VOTE SCORE BADGES (total across all content) ──────────────────────────────
+('Liked',            'Received a net positive vote score across all posts.',    'bronze', 'total_votes_received',  1),
+('Appreciated',      'Reached a total vote score of 25.',                       'silver', 'total_votes_received',  25),
+('Celebrated',       'Reached a total vote score of 100.',                      'gold',   'total_votes_received',  100),
+
+-- ── ANSWER QUALITY BADGES (single best answer score) ─────────────────────────
+('Good Answer',      'An answer of yours reached a score of 5.',               'bronze', 'answer_score',          5),
+('Great Answer',     'An answer of yours reached a score of 25.',              'silver', 'answer_score',          25),
+('Legendary Answer', 'An answer of yours reached a score of 100.',             'gold',   'answer_score',          100)
+
+ON CONFLICT (name) DO NOTHING;
+
+COMMIT;

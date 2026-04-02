@@ -174,13 +174,20 @@ const updateAnswerStatus = async (answerId, isAccepted, acceptedAt) => {
             `UPDATE answer
             SET is_accepted = $1, accepted_at = $2
             WHERE content_id = $3
-            RETURNING content_id, is_accepted, accepted_at`,
+            RETURNING content_id, is_accepted, accepted_at, question_id`,
             [isAccepted, acceptedAt, answerId]
         );
         
         if (updateAnswer.rowCount === 0) {
             throw new Error('NOT_FOUND');
         }
+        
+        await client.query(
+            `UPDATE question
+            SET is_answered = $1
+            WHERE content_id = $2`,
+            [isAccepted, updateAnswer.rows[0]['question_id']]
+        );
         
         return updateAnswer.rows[0];
     })

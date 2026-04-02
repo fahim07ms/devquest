@@ -1,6 +1,7 @@
 import {sendErrorResponse} from "../utils/error.js";
 import UserModel from "../models/userModel.js";
 import cloudinary from "../config/cloudinary.js";
+import pool from "../db/pool.js";
 
 export const getUserDetails = async (req, res) => {
     try {
@@ -200,3 +201,80 @@ export const getUserAnswers = async (req, res) => {
         )
     }
 }
+
+// Get user badges
+export const getUserBadges = async (req, res) => {
+    const { username } = req.params;
+    
+    try {
+        const result = await pool.query(
+            `SELECT
+                ba.award_id       AS "badgeId",
+                b.name,
+                b.description,
+                b.badge_tier      AS "tier",
+                b.criteria_type   AS "criteriaType",
+                b.criteria_threshold AS "criteriaThreshold",
+                b.icon_url        AS "iconUrl",
+                ba.awarded_at     AS "awardedAt"
+             FROM badge_award ba
+             JOIN badge b ON ba.badge_id = b.badge_id
+             JOIN "user" u ON ba.user_id = u.user_id
+             WHERE u.username = $1
+             ORDER BY ba.awarded_at DESC`,
+            [username]
+        );
+        
+        return res.status(200).json({
+            data: { badges: result.rows },
+            message: 'Badges fetched successfully.'
+        });
+    } catch (error) {
+        if (process.env.NODE_ENV === 'development') console.error(error);
+        return sendErrorResponse(res, 500, 'Internal Server Error');
+    }
+};
+
+// get user reputation history
+export const getMyReputationHistory = async (req, res) => {
+    const userId = req.userId;
+    const page   = parseInt(req.query.page,  10) || 1;
+    const limit  = parseInt(req.query.limit, 10) || 50;
+    const offset = (page - 1) * limit;
+    
+    try {
+        const result = await pool.query(
+            `SELECT
+                history_id          AS "historyId",
+                change_amount       AS "changeAmount",
+                reason,
+                related_entity_type AS "relatedEntityType",
+                related_entity_id   AS "relatedEntityId",
+                created_at          AS "createdAt"
+             FROM reputation_history
+             WHERE user_id = $1
+             ORDER BY created_at DESC
+             LIMIT $2 OFFSET $3`,
+            [userId, limit, offset]
+        );
+        
+        const countRes = await pool.query(
+            `SELECT COUNT(*) FROM reputation_history WHERE user_id = $1`,
+            [userId]
+        );
+        
+        const total = parseInt(countRes.rows[0].count, 10);
+        
+        return res.status(200).json({
+            data: {
+                history: result.rows,
+                total,
+                hasMore: offset + limit < total
+            },
+            message: 'Reputation history fetched successfully.'
+        });
+    } catch (error) {
+        if (process.env.NODE_ENV === 'development') console.error(error);
+        return sendErrorResponse(res, 500, 'Internal Server Error');
+    }
+};

@@ -1,12 +1,17 @@
 import BountyModel from '../models/bountyModel.js';
+import pool from '../db/pool.js';
 import { sendErrorResponse } from '../utils/error.js';
 
-// Create a bounty
+// Create a bounty on a question
 export const createBounty = async (req, res) => {
     const { questionId } = req.params;
     const { amount, reason } = req.body;
     const userId = req.userId;
-
+    
+    if (!questionId) {
+        return sendErrorResponse(res, 400, 'Question ID is required.');
+    }
+    
     if (!amount || isNaN(amount) || amount <= 0) {
         return sendErrorResponse(res, 400, 'Invalid bounty amount.');
     }
@@ -14,47 +19,67 @@ export const createBounty = async (req, res) => {
     if (!reason || reason.trim().length === 0) {
         return sendErrorResponse(res, 400, 'Bounty reason is required.');
     }
-
+    
     try {
-        const bounty = await BountyModel.createBounty(questionId, userId, amount, reason);
+        const bounty = await BountyModel.createBounty(questionId, userId, parseInt(amount), reason.trim());
+        
         return res.status(201).json({
             data: { bounty },
             message: 'Bounty created successfully.'
         });
     } catch (error) {
-        if (process.env.NODE_ENV === 'development') console.log(error);
+        if (process.env.NODE_ENV === 'development') console.error(error);
         
         if (error.message === 'INSUFFICIENT_REPUTATION') {
             return sendErrorResponse(res, 400, 'Not enough reputation to offer this bounty.');
         }
-
-        // Potential foreign key violation if question doesn't exist
+        
+        // Foreign key violation — question doesn't exist
         if (error.code === '23503') {
             return sendErrorResponse(res, 404, 'Question not found.');
         }
-
+        
         return sendErrorResponse(res, 500, 'Internal Server Error');
     }
 };
 
-// Award a bounty
+// Award a bounty to a specific answer
 export const awardBounty = async (req, res) => {
     const { bountyId } = req.params;
     const { answerId } = req.body;
     const userId = req.userId;
-
+    
+    if (!answerId) {
+        return sendErrorResponse(res, 400, 'Answer ID is required.');
+    }
+    
     try {
-        // We could fetch the bounty first to verify the owner.
-        // For security, only the bounty offerer or an admin/mod can award it.
-        const bountyCheckRes = await BountyModel.awardBounty(bountyId, answerId, userId);
+        // Verify the requester is either the bounty offerer or a moderator/admin
+        const bountyCheck = await pool.query(
+            `SELECT offered_by FROM bounty WHERE bounty_id = $1`,
+            [bountyId]
+        );
+        
+        if (bountyCheck.rowCount === 0) {
+            return sendErrorResponse(res, 404, 'Bounty not found.');
+        }
+        
+        const isOfferer = bountyCheck.rows[0].offered_by === userId;
+        const isModerator = ['moderator', 'admin'].includes(req.role);
+        
+        if (!isOfferer && !isModerator) {
+            return sendErrorResponse(res, 403, 'Only the bounty offerer can award it.');
+        }
+        
+        const bounty = await BountyModel.awardBounty(bountyId, answerId, userId);
         
         return res.status(200).json({
-            data: { bounty: bountyCheckRes },
+            data: { bounty },
             message: 'Bounty awarded successfully.'
         });
     } catch (error) {
-        if (process.env.NODE_ENV === 'development') console.log(error);
-
+        if (process.env.NODE_ENV === 'development') console.error(error);
+        
         if (error.message === 'BOUNTY_NOT_ACTIVE') {
             return sendErrorResponse(res, 400, 'Bounty is no longer active.');
         }
@@ -62,7 +87,7 @@ export const awardBounty = async (req, res) => {
             return sendErrorResponse(res, 404, 'Bounty not found.');
         }
         if (error.message === 'ANSWER_NOT_FOUND') {
-            return sendErrorResponse(res, 404, 'Specific answer not found.');
+            return sendErrorResponse(res, 404, 'Answer not found or does not belong to this question.');
         }
         
         return sendErrorResponse(res, 500, 'Internal Server Error');

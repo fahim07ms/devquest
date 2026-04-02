@@ -17,10 +17,10 @@ const createBounty = async (questionId, offeredBy, amount, reason) => {
         }
 
         // 2. Deduct reputation from user
-        await client.query(
-            `UPDATE "user" SET reputation_points = reputation_points - $1 WHERE user_id = $2`,
-            [amount, offeredBy]
-        );
+        // await client.query(
+        //     `UPDATE "user" SET reputation_points = reputation_points - $1 WHERE user_id = $2`,
+        //     [amount, offeredBy]
+        // );
 
         // 3. Insert into bounty
         const bountyRes = await client.query(
@@ -58,22 +58,18 @@ const awardBounty = async (bountyId, answerId, awardedBy) => {
 
         // 2. Validate bounty state and permissions
         if (bounty.status !== 'active') throw new Error("BOUNTY_NOT_ACTIVE");
-        
-        // Let's assume the user awarding it must be the one who offered it (or moderator, but handled in controller)
-        // If awardedBy isn't the offerer and we want to enforce it at DB level:
-        // Here we'll just check it blindly, controller does auth validation
 
         // 3. Get the answer author
         const ansRes = await client.query(
             `SELECT c.author_id 
              FROM answer a
              JOIN content c ON a.content_id = c.content_id
-             WHERE a.content_id = $1`,
-            [answerId]
+             WHERE a.content_id = $1 AND a.question_id = $2`,
+            [answerId, bounty.question_id]
         );
         if (ansRes.rowCount === 0) throw new Error("ANSWER_NOT_FOUND");
         const answerAuthorId = ansRes.rows[0].author_id;
-
+        
         // 4. Update bounty status
         const updatedBounty = await client.query(
             `UPDATE bounty 
@@ -85,11 +81,6 @@ const awardBounty = async (bountyId, answerId, awardedBy) => {
 
         // 5. Grant reputation to the answer's author (if they exist)
         if (answerAuthorId) {
-            await client.query(
-                `UPDATE "user" SET reputation_points = reputation_points + $1 WHERE user_id = $2`,
-                [bounty.amount, answerAuthorId]
-            );
-
             // 6. Record reputation history for the recipient
             await client.query(
                 `INSERT INTO reputation_history (user_id, change_amount, reason, related_entity_type, related_entity_id)

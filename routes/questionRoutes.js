@@ -19,6 +19,7 @@ import {createAnswer, getAnswersByQuestionId} from "../controllers/answerControl
 import {createComment, getCommentsByParentId} from "../controllers/commentController.js";
 import {answerSchema} from "../validation/answerSchema.js";
 import {commentSchema} from "../validation/commentSchema.js";
+import {createBounty} from "../controllers/bountyController.js";
 
 // Public routes (with optional auth to detect moderators for bypass of frozen content filter)
 router.get('/', optionalAuthMiddleware, getQuestions);
@@ -35,6 +36,7 @@ router.put('/:questionId', authMiddleware, validateBody(questionSchema), editQue
 router.delete('/:questionId', authMiddleware, deleteQuestion);
 router.post('/:questionId/answers', authMiddleware, validateBody(answerSchema), createAnswer);
 router.post('/:questionId/comments', authMiddleware, validateBody(commentSchema), createComment);
+router.post('/:questionId/bounties', authMiddleware, createBounty);
 
 export default router;
 

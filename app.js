@@ -29,6 +29,7 @@ import bountyRoutes from "./routes/bountyRoutes.js";
 
 import { getFlagsByContentId } from './controllers/flagController.js';
 import authMiddleware, { moderatorMiddleware }from "./middleware/authMiddleware.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 
 
 // API Routes
@@ -44,6 +45,7 @@ app.use('/api/bookmarks', bookmarkRoutes);
 
 app.use('/api/questions/:questionId/bounties', bountyRoutes);
 app.use('/api/bounties', bountyRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Getting flags on a specific content
 app.get('/api/content/:contentId/flags', authMiddleware, moderatorMiddleware, getFlagsByContentId);
