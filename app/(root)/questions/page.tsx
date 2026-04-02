@@ -13,17 +13,19 @@ import {
     XIcon,
     CheckIcon,
     MagnifyingGlassIcon,
-    SortDescendingIcon, SortAscendingIcon,
+    SortDescendingIcon,
+    SortAscendingIcon,
+    CurrencyDollarIcon,
 } from '@phosphor-icons/react'
 import { useAuthStore } from '@/store/authStore'
 import api from '@/lib/api'
-import {CustomPagination} from "@/components/questions/Pagination";
+import { CustomPagination } from '@/components/questions/Pagination'
 
 const SORT_TABS = [
-    { label: 'Newest',     value: 'createdAt' },
-    { label: 'Activity',     value: 'lastActivityAt' },
-    { label: 'Votes',      value: 'voteScore' },
-    { label: 'Answers', value: 'answersCount' },
+    { label: 'Newest',   value: 'createdAt' },
+    { label: 'Activity', value: 'lastActivityAt' },
+    { label: 'Votes',    value: 'voteScore' },
+    { label: 'Answers',  value: 'answersCount' },
 ]
 
 const ANSWER_FILTERS = [
@@ -33,33 +35,33 @@ const ANSWER_FILTERS = [
 ]
 
 export default function QuestionsPage() {
-    const router = useRouter()
+    const router       = useRouter()
     const searchParams = useSearchParams()
     const { isAuthenticated } = useAuthStore()
 
-    // State
-    const [questions, setQuestions]   = useState<Question[]>([])
-    const [totalPages, setTotalPages] = useState(1)
-    const [totalCount, setTotalCount] = useState(0)
-    const [isLoading, setIsLoading]   = useState(true)
-    const [mounted, setMounted]       = useState(false)
-    const [filterOpen, setFilterOpen] = useState(false)
-    const [allTags, setAllTags]       = useState<{ tag_id: string; name: string }[]>([])
-    const [tagSearch, setTagSearch]   = useState('')
+    const [questions,   setQuestions]   = useState<Question[]>([])
+    const [totalPages,  setTotalPages]  = useState(1)
+    const [totalCount,  setTotalCount]  = useState(0)
+    const [isLoading,   setIsLoading]   = useState(true)
+    const [mounted,     setMounted]     = useState(false)
+    const [filterOpen,  setFilterOpen]  = useState(false)
+    const [allTags,     setAllTags]     = useState<{ tag_id: string; name: string }[]>([])
+    const [tagSearch,   setTagSearch]   = useState('')
     const filterRef = useRef<HTMLDivElement>(null)
 
-    // Params
-    const search       = searchParams.get('search')   || undefined
-    const sort         = searchParams.get('sort')     || 'createdAt'
-    const tagParam     = searchParams.get('tags')     || undefined
-    const answerFilter = searchParams.get('answered') || ''
+    // Read params
+    const search       = searchParams.get('search')    || undefined
+    const sort         = searchParams.get('sort')      || 'createdAt'
+    const tagParam     = searchParams.get('tags')      || undefined
+    const answerFilter = searchParams.get('answered')  || ''
+    const bountyFilter = searchParams.get('hasBounty') || ''
     const page         = parseInt(searchParams.get('page') || '1', 10)
+    const order        = searchParams.get('order')     || 'desc'
     const activeTags   = tagParam ? tagParam.split(',').filter(Boolean) : []
-    const order = searchParams.get('order') || 'desc'
 
     useEffect(() => { setMounted(true) }, [])
 
-    // Close the filter panel when clicking outside it
+    // Close filter panel on outside click
     useEffect(() => {
         const handler = (e: MouseEvent) => {
             if (filterRef.current && !filterRef.current.contains(e.target as Node))
@@ -69,13 +71,9 @@ export default function QuestionsPage() {
         return () => document.removeEventListener('mousedown', handler)
     }, [])
 
-    // Fetch tags
+    // Fetch available tags
     useEffect(() => {
-        const fetchTags = async () => {
-            const res = await api.get('/tags');
-            setAllTags(res.data.data.tags || []);
-        }
-        fetchTags()
+        api.get('/tags').then(res => setAllTags(res.data?.data?.tags ?? [])).catch(() => {})
     }, [])
 
     // Fetch questions
@@ -83,18 +81,18 @@ export default function QuestionsPage() {
         const fetchQuestions = async () => {
             setIsLoading(true)
             try {
-
-                // Split the tags param into an array of tag IDs
+                // Resolve tag names → IDs for the API
                 const tags = tagParam ? tagParam.split(',').filter(Boolean) : []
                 const filteredTagIds = tags.length > 0
-                    ? allTags
-                        .filter((t) => tags.includes(t.name))
-                        .map((t) => t.tag_id)
+                    ? allTags.filter(t => tags.includes(t.name)).map(t => t.tag_id)
                     : []
-                const answered = answerFilter === 'answered' ? 'true' : answerFilter === 'unanswered' ? 'false' : undefined
 
-                const tagIds = filteredTagIds.join(',');
-                console.log(tagIds);
+                // Convert UI filter values to the API's expected format
+                const answeredParam =
+                    answerFilter === 'answered'   ? 'true'  :
+                        answerFilter === 'unanswered' ? 'false' :
+                            undefined
+
                 const res = await api.get('/questions', {
                     params: {
                         page,
@@ -102,15 +100,15 @@ export default function QuestionsPage() {
                         search,
                         sort,
                         order,
-                        tags: tagIds,
-                        answered: answered,
+                        tags:      filteredTagIds.join(',') || undefined,
+                        answered:  answeredParam,
+                        hasBounty: bountyFilter || undefined,
                     }
                 })
 
-                setQuestions(res.data.data.questions || [])
-                setTotalPages(res.data.data.totalPages || 1)
-                setTotalCount(res.data.data.totalQuestions || 0)
-
+                setQuestions(res.data.data.questions   ?? [])
+                setTotalPages(res.data.data.totalPages  ?? 1)
+                setTotalCount(res.data.data.totalQuestions ?? 0)
             } catch (err) {
                 console.error('Failed to fetch questions:', err)
             } finally {
@@ -118,7 +116,7 @@ export default function QuestionsPage() {
             }
         }
         fetchQuestions()
-    }, [search, sort, order, tagParam, answerFilter, page])
+    }, [search, sort, order, tagParam, answerFilter, bountyFilter, page, allTags])
 
     const pushParams = (updates: Record<string, string | undefined>) => {
         const p = new URLSearchParams(searchParams.toString())
@@ -130,32 +128,25 @@ export default function QuestionsPage() {
         router.push(`/questions?${p.toString()}`)
     }
 
-    // Toggle a tag
     const toggleTag = (tagName: string) => {
         const next = activeTags.includes(tagName)
-            ? activeTags.filter((t) => t !== tagName)
+            ? activeTags.filter(t => t !== tagName)
             : [...activeTags, tagName]
         pushParams({ tags: next.length ? next.join(',') : undefined })
     }
 
-    // Clear all filters
     const clearAllFilters = () => {
         const p = new URLSearchParams()
         if (search) p.set('search', search)
         router.push(`/questions?${p.toString()}`)
     }
 
-    // Handle pagination
-    const hasActiveFilters = activeTags.length > 0 || !!answerFilter
-    const filteredTagList = allTags.filter((t) =>
-        t.name.toLowerCase().includes(tagSearch.toLowerCase())
-    )
+    const hasActiveFilters = activeTags.length > 0 || !!answerFilter || !!bountyFilter
+    const filteredTagList  = allTags.filter(t => t.name.toLowerCase().includes(tagSearch.toLowerCase()))
 
     const pageTitle = search
         ? `Results for "${search}"`
-        : activeTags.length > 0
-            ? `Tagged: ${activeTags.join(', ')}`
-            : 'All Questions'
+        : activeTags.length > 0 ? `Tagged: ${activeTags.join(', ')}` : 'All Questions'
 
     return (
         <div className={cn('max-w-4xl mx-auto w-full px-5 py-8 transition-opacity duration-500', mounted ? 'opacity-100' : 'opacity-0')}>
@@ -190,8 +181,9 @@ export default function QuestionsPage() {
             {/* ── Sort + filter bar ── */}
             <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
+                    {/* Sort tabs */}
                     <div className="flex items-center gap-0.5 bg-muted/40 p-0.5 border border-border/40">
-                        {SORT_TABS.map((tab) => (
+                        {SORT_TABS.map(tab => (
                             <button
                                 key={tab.value}
                                 onClick={() => pushParams({ sort: tab.value })}
@@ -207,25 +199,31 @@ export default function QuestionsPage() {
                         ))}
                     </div>
 
-                    <Button variant="ghost" size="sm" onClick={() => pushParams({ order: order === 'desc' ? 'asc' : 'desc' })}>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => pushParams({ order: order === 'desc' ? 'asc' : 'desc' })}
+                    >
                         {order === 'desc' ? <SortDescendingIcon size={20} /> : <SortAscendingIcon size={20} />}
                     </Button>
                 </div>
 
-
+                {/* Filter button */}
                 <div className="relative" ref={filterRef}>
                     <button
-                        onClick={() => setFilterOpen((v) => !v)}
+                        onClick={() => setFilterOpen(v => !v)}
                         className={cn(
                             'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-border/40 hover:bg-muted/40 transition-all duration-150',
-                            hasActiveFilters ? 'text-primary border-primary/30 bg-primary/5' : 'text-muted-foreground hover:text-foreground'
+                            hasActiveFilters
+                                ? 'text-primary border-primary/30 bg-primary/5'
+                                : 'text-muted-foreground hover:text-foreground'
                         )}
                     >
                         <FunnelIcon className="h-3.5 w-3.5" weight={hasActiveFilters ? 'fill' : 'regular'} />
                         Filter
                         {hasActiveFilters && (
                             <span className="h-4 w-4 flex items-center justify-center bg-primary text-primary-foreground text-[10px] font-bold">
-                                {activeTags.length + (answerFilter ? 1 : 0)}
+                                {activeTags.length + (answerFilter ? 1 : 0) + (bountyFilter ? 1 : 0)}
                             </span>
                         )}
                     </button>
@@ -241,7 +239,7 @@ export default function QuestionsPage() {
                                             Clear all
                                         </button>
                                     )}
-                                    <button onClick={() => setFilterOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                                    <button onClick={() => setFilterOpen(false)} className="text-muted-foreground hover:text-foreground">
                                         <XIcon className="h-3.5 w-3.5" />
                                     </button>
                                 </div>
@@ -250,15 +248,19 @@ export default function QuestionsPage() {
                             <div className="p-4 space-y-5">
                                 {/* Answer status */}
                                 <div>
-                                    <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-2">Answer status</p>
+                                    <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-2">
+                                        Answer status
+                                    </p>
                                     <div className="flex flex-col gap-0.5">
-                                        {ANSWER_FILTERS.map((f) => (
+                                        {ANSWER_FILTERS.map(f => (
                                             <button
                                                 key={f.value}
                                                 onClick={() => pushParams({ answered: f.value || undefined })}
                                                 className={cn(
                                                     'flex items-center justify-between px-3 py-2 text-xs transition-colors duration-150 text-left',
-                                                    answerFilter === f.value ? 'bg-primary/10 text-primary' : 'text-foreground/80 hover:bg-muted/50'
+                                                    answerFilter === f.value
+                                                        ? 'bg-primary/10 text-primary'
+                                                        : 'text-foreground/80 hover:bg-muted/50'
                                                 )}
                                             >
                                                 {f.label}
@@ -268,22 +270,47 @@ export default function QuestionsPage() {
                                     </div>
                                 </div>
 
-                                {/* Bountied — TODO */}
+                                {/* Bounty filter */}
                                 <div>
-                                    <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-2">Bounty</p>
-                                    <button disabled title="Coming soon" className="flex items-center justify-between w-full px-3 py-2 text-xs text-muted-foreground/40 cursor-not-allowed">
-                                        Bountied
-                                        <span className="text-[10px] bg-muted px-1.5 py-0.5 text-muted-foreground/50">Soon</span>
-                                    </button>
+                                    <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-2">
+                                        Bounty
+                                    </p>
+                                    <div className="flex flex-col gap-0.5">
+                                        {[
+                                            { label: 'All questions',    value: '' },
+                                            { label: 'Has active bounty', value: 'true' },
+                                        ].map(f => (
+                                            <button
+                                                key={f.value}
+                                                onClick={() => pushParams({ hasBounty: f.value || undefined })}
+                                                className={cn(
+                                                    'flex items-center justify-between px-3 py-2 text-xs transition-colors duration-150 text-left',
+                                                    bountyFilter === f.value
+                                                        ? 'bg-primary/10 text-primary'
+                                                        : 'text-foreground/80 hover:bg-muted/50'
+                                                )}
+                                            >
+                                                <span className="flex items-center gap-1.5">
+                                                    {f.value === 'true' && (
+                                                        <CurrencyDollarIcon className="h-3 w-3 text-blue-500" />
+                                                    )}
+                                                    {f.label}
+                                                </span>
+                                                {bountyFilter === f.value && <CheckIcon className="h-3 w-3 text-primary" />}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
 
                                 {/* Tags */}
                                 <div>
-                                    <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-2">Tags</p>
+                                    <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-2">
+                                        Tags
+                                    </p>
 
                                     {activeTags.length > 0 && (
                                         <div className="flex flex-wrap gap-1 mb-2">
-                                            {activeTags.map((name) => (
+                                            {activeTags.map(name => (
                                                 <button
                                                     key={name}
                                                     onClick={() => toggleTag(name)}
@@ -300,7 +327,7 @@ export default function QuestionsPage() {
                                         <input
                                             type="text"
                                             value={tagSearch}
-                                            onChange={(e) => setTagSearch(e.target.value)}
+                                            onChange={e => setTagSearch(e.target.value)}
                                             placeholder="Search tags…"
                                             className="w-full pl-7 pr-3 py-1.5 text-xs bg-muted/40 border border-border/40 outline-none focus:border-primary/40 transition-colors"
                                         />
@@ -310,11 +337,11 @@ export default function QuestionsPage() {
                                         {filteredTagList.length === 0 ? (
                                             <p className="text-xs text-muted-foreground/50 px-2 py-2">No tags found.</p>
                                         ) : (
-                                            filteredTagList.map((tag) => {
+                                            filteredTagList.map(tag => {
                                                 const active = activeTags.includes(tag.name)
                                                 return (
                                                     <button
-                                                        key={tag["tag_id"]}
+                                                        key={tag['tag_id']}
                                                         onClick={() => toggleTag(tag.name)}
                                                         className={cn(
                                                             'flex items-center justify-between w-full px-2.5 py-1.5 text-xs transition-colors duration-150',
@@ -343,20 +370,20 @@ export default function QuestionsPage() {
                 <div className="flex flex-wrap items-center gap-1.5 mb-4 pt-2">
                     <span className="text-[11px] text-muted-foreground/60">Active filters:</span>
                     {answerFilter && (
-                        <button
-                            onClick={() => pushParams({ answered: undefined })}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium bg-primary/10 text-primary border border-primary/20 hover:opacity-70 transition-opacity"
-                        >
-                            {ANSWER_FILTERS.find((f) => f.value === answerFilter)?.label}
+                        <button onClick={() => pushParams({ answered: undefined })} className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium bg-primary/10 text-primary border border-primary/20 hover:opacity-70 transition-opacity">
+                            {ANSWER_FILTERS.find(f => f.value === answerFilter)?.label}
                             <XIcon className="h-2.5 w-2.5" />
                         </button>
                     )}
-                    {activeTags.map((name) => (
-                        <button
-                            key={name}
-                            onClick={() => toggleTag(name)}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium bg-primary/10 text-primary border border-primary/20 hover:opacity-70 transition-opacity"
-                        >
+                    {bountyFilter && (
+                        <button onClick={() => pushParams({ hasBounty: undefined })} className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 hover:opacity-70 transition-opacity">
+                            <CurrencyDollarIcon className="h-3 w-3" />
+                            Has bounty
+                            <XIcon className="h-2.5 w-2.5" />
+                        </button>
+                    )}
+                    {activeTags.map(name => (
+                        <button key={name} onClick={() => toggleTag(name)} className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium bg-primary/10 text-primary border border-primary/20 hover:opacity-70 transition-opacity">
                             {name} <XIcon className="h-2.5 w-2.5" />
                         </button>
                     ))}
@@ -381,11 +408,9 @@ export default function QuestionsPage() {
                                 <div className="flex-1 space-y-2">
                                     <div className="h-4 w-3/4 bg-muted" />
                                     <div className="h-3 w-full bg-muted" />
-                                    <div className="h-3 w-2/3 bg-muted" />
                                     <div className="flex gap-1">
                                         <div className="h-4 w-12 bg-muted" />
                                         <div className="h-4 w-10 bg-muted" />
-                                        <div className="h-4 w-14 bg-muted" />
                                     </div>
                                 </div>
                             </div>
@@ -422,7 +447,7 @@ export default function QuestionsPage() {
                     <CustomPagination
                         currentPage={page}
                         totalPages={totalPages}
-                        onPageChange={(newPage) => pushParams({ page: String(newPage) })}
+                        onPageChange={newPage => pushParams({ page: String(newPage) })}
                     />
                 </div>
             )}

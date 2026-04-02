@@ -26,9 +26,9 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import {FlagDialog} from "@/components/flags/FlagDialog";
-import {FlagButton} from "@/components/flags/FlagButton";
-import {useAuthStore} from "@/store/authStore";
+import { FlagDialog } from '@/components/flags/FlagDialog'
+import { FlagButton } from '@/components/flags/FlagButton'
+import { useAuthStore } from '@/store/authStore'
 
 export function AnswerCard({
                                answer,
@@ -36,14 +36,14 @@ export function AnswerCard({
                                hasAcceptedAnswer,
                                currentUserId,
                                comments,
+                               canAwardBounty,
+                               onAwardBounty,
                                onAccept,
                                onEdited,
                                onDeleted,
                                onCommentAdded,
                                onCommentEdited,
                                onCommentDeleted,
-                               canAwardBounty,
-                               onAwardBounty,
                            }: {
     answer: Answer
     isQuestionAuthor: boolean
@@ -59,22 +59,19 @@ export function AnswerCard({
     onCommentEdited:  (commentId: string, updated: CommentType) => void
     onCommentDeleted: (commentId: string) => void
 }) {
-    const { isAuthenticated, user } = useAuthStore();
-    const isOwn = !!currentUserId && answer.author?.authorId === currentUserId;
-    const isModerator = user?.role === 'admin' || user?.role === 'moderator';
+    const { isAuthenticated, user } = useAuthStore()
+    const isOwn       = !!currentUserId && answer.author?.authorId === currentUserId
+    const isModerator = user?.role === 'admin' || user?.role === 'moderator'
 
-    const [isEditing, setIsEditing]         = useState(false)
-    const [editBody, setEditBody]           = useState<JSONContent>({})
-    const [isSaving, setIsSaving]           = useState(false)
-    const [isAccepting, setIsAccepting]     = useState(false)
-    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-    const [flagDialogOpen, setFlagDialogOpen] = useState(false);
+    const [isEditing,        setIsEditing]        = useState(false)
+    const [editBody,         setEditBody]          = useState<JSONContent>({})
+    const [isSaving,         setIsSaving]          = useState(false)
+    const [isAccepting,      setIsAccepting]       = useState(false)
+    const [deleteDialogOpen, setDeleteDialogOpen]  = useState(false)
+    const [flagDialogOpen,   setFlagDialogOpen]    = useState(false)
 
     const handleSave = async () => {
-        const empty =
-            !editBody ||
-            JSON.stringify(editBody) === '{}' ||
-            (editBody as any)?.content?.length === 0
+        const empty = !editBody || JSON.stringify(editBody) === '{}' || (editBody as any)?.content?.length === 0
         if (empty) return toast.error('Answer cannot be empty.')
         setIsSaving(true)
         try {
@@ -125,7 +122,7 @@ export function AnswerCard({
         }
     }
 
-    // Show accept button only when: question author AND (no accepted answer yet OR this one is accepted)
+    // Show accept button when: question author AND (no accepted answer yet OR this one is already accepted)
     const showAcceptBtn = isQuestionAuthor && (!hasAcceptedAnswer || answer.isAccepted)
 
     return (
@@ -144,6 +141,7 @@ export function AnswerCard({
             <div className="flex flex-col items-center gap-2.5 w-10 flex-shrink-0 pt-0.5">
                 <VoteButtons score={answer.voteScore} contentId={answer.id} />
 
+                {/* Accept / accepted indicator */}
                 {showAcceptBtn ? (
                     <button
                         type="button"
@@ -157,10 +155,7 @@ export function AnswerCard({
                                 : 'text-muted-foreground/40 hover:text-emerald-500'
                         )}
                     >
-                        <CheckCircleIcon
-                            weight={answer.isAccepted ? 'fill' : 'regular'}
-                            className="h-5 w-5"
-                        />
+                        <CheckCircleIcon weight={answer.isAccepted ? 'fill' : 'regular'} className="h-5 w-5" />
                     </button>
                 ) : answer.isAccepted ? (
                     <div className="text-emerald-500 mt-1" title="Accepted answer">
@@ -168,14 +163,15 @@ export function AnswerCard({
                     </div>
                 ) : null}
 
-                {canAwardBounty && !answer.isAccepted && (
+                {/* Award bounty — visible whenever there's an active bounty, regardless of acceptance */}
+                {canAwardBounty && (
                     <button
                         type="button"
                         onClick={() => onAwardBounty?.(answer.id)}
                         title="Award active bounty to this answer"
-                        className="p-1 px-[5px] mt-2 transition-colors duration-150 bg-blue-500/10 text-blue-700 dark:text-blue-400 hover:bg-blue-500 hover:text-white dark:hover:text-white rounded text-[10px] font-bold text-center leading-tight whitespace-normal"
+                        className="p-1 px-[5px] mt-2 transition-colors duration-150 bg-blue-500/10 text-blue-700 dark:text-blue-400 hover:bg-blue-500 hover:text-white dark:hover:text-white text-[10px] font-bold text-center leading-tight whitespace-normal"
                     >
-                        Award Bounty
+                        Award<br />Bounty
                     </button>
                 )}
             </div>
@@ -189,7 +185,7 @@ export function AnswerCard({
                             Frozen by a moderator and hidden from the public.
                         </div>
                         {isModerator && (
-                            <button 
+                            <button
                                 onClick={handleUnfreezeAnswer}
                                 className="text-[10px] uppercase tracking-wider font-bold px-2 py-1 border border-amber-500/30 hover:bg-amber-500/20 text-amber-700 transition-colors"
                             >
@@ -226,19 +222,11 @@ export function AnswerCard({
                                 {isOwn && (
                                     <>
                                         <ActionBtn
-                                            onClick={() => {
-                                                setEditBody(answer.body as JSONContent)
-                                                setIsEditing(true)
-                                            }}
+                                            onClick={() => { setEditBody(answer.body as JSONContent); setIsEditing(true) }}
                                             icon={PencilSimpleLineIcon}
                                             label="Edit"
                                         />
-
-                                        {/* AlertDialog-driven delete */}
-                                        <AlertDialog
-                                            open={deleteDialogOpen}
-                                            onOpenChange={setDeleteDialogOpen}
-                                        >
+                                        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                                             <AlertDialogTrigger asChild>
                                                 <button
                                                     type="button"
@@ -270,12 +258,8 @@ export function AnswerCard({
                                     </>
                                 )}
 
-                                {/* Flag — authenticated non-owners only */}
                                 {isAuthenticated && !isOwn && (
-                                    <FlagButton
-                                        variant="inline"
-                                        onClick={() => setFlagDialogOpen(true)}
-                                    />
+                                    <FlagButton variant="inline" onClick={() => setFlagDialogOpen(true)} />
                                 )}
                             </div>
 

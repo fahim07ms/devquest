@@ -3,6 +3,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import type { Author } from '@/types'
 import { cn } from '@/lib/utils'
+import Link from "next/link";
 
 interface UserAvatarProps {
     author: Author
@@ -59,9 +60,11 @@ export function UserAvatar({ author, size = 'md', showName = true, timestamp, cl
             </Avatar>
             {showName && (
                 <div className="flex flex-col leading-tight">
-                    <span className={cn('font-medium text-foreground', size === 'sm' ? 'text-xs' : 'text-sm')}>
-                        {displayName}
-                    </span>
+                    <Link href={`/users/${author.username}`} className="flex items-center gap-1">
+                        <span className={cn('font-medium text-foreground', size === 'sm' ? 'text-xs' : 'text-sm')}>
+                            {displayName}
+                        </span>
+                    </Link>
                     {timestamp && (
                         <span className="text-xs text-muted-foreground">
                             {formatRelativeTime(timestamp)}

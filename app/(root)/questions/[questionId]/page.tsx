@@ -12,95 +12,211 @@ import { VoteButtons } from '@/components/questions/VoteButtons'
 import { TagBadge } from '@/components/ui/TagBadge'
 import { UserAvatar } from '@/components/ui/UserAvatar'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import {
     ArrowLeftIcon, ClockClockwiseIcon, PencilSimpleLineIcon,
-    EyeIcon, CheckCircleIcon, TrashIcon, ArrowBendDownRightIcon, LockKeyIcon,
-    BookmarkSimple
+    EyeIcon, TrashIcon, LockKeyIcon, BookmarkSimple,
+    CurrencyDollarIcon,
 } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'
 import { JSONContent } from '@tiptap/core'
-import { ActionBtn } from "@/components/questions/ActionBtn";
-import { InlineEditFooter } from "@/components/questions/InlineEditFooter";
-import { CommentThread } from "@/components/comments/CommentThread";
-import { AnswerCard } from "@/components/answers/AnswerCard";
-import {FlagButton} from "@/components/flags/FlagButton";
-import {FlagDialog} from "@/components/flags/FlagDialog";
+import { ActionBtn }        from '@/components/questions/ActionBtn'
+import { InlineEditFooter } from '@/components/questions/InlineEditFooter'
+import { CommentThread }    from '@/components/comments/CommentThread'
+import { AnswerCard }       from '@/components/answers/AnswerCard'
+import { FlagButton }       from '@/components/flags/FlagButton'
+import { FlagDialog }       from '@/components/flags/FlagDialog'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+
+// ── Add Bounty Dialog ─────────────────────────────────────────────────────────
+
+function AddBountyDialog({
+                             open,
+                             onClose,
+                             onSuccess,
+                             questionId,
+                         }: {
+    open: boolean
+    onClose: () => void
+    onSuccess: (bounty: { id: string; amount: number; expiresAt: string }) => void
+    questionId: string
+}) {
+    const [amount,    setAmount]    = useState('')
+    const [reason,    setReason]    = useState('')
+    const [isPosting, setIsPosting] = useState(false)
+    const [error,     setError]     = useState<string | null>(null)
+
+    useEffect(() => {
+        if (open) { setAmount(''); setReason(''); setError(null) }
+    }, [open])
+
+    const handleSubmit = async () => {
+        const parsed = parseInt(amount, 10)
+        if (!parsed || parsed < 50) { setError('Minimum bounty amount is 50 reputation.'); return }
+        if (!reason.trim())         { setError('A reason is required.'); return }
+
+        setIsPosting(true)
+        setError(null)
+        try {
+            const res = await api.post(`/questions/${questionId}/bounties`, {
+                amount: parsed,
+                reason: reason.trim(),
+            })
+            const bounty = res.data.data.bounty
+            onSuccess({ id: bounty.bounty_id, amount: bounty.amount, expiresAt: bounty.expires_at })
+            toast.success('Bounty posted successfully.')
+            onClose()
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'Failed to post bounty.')
+        } finally {
+            setIsPosting(false)
+        }
+    }
+
+    if (!open) return null
+
+    return (
+        <>
+            <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+            <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-sm bg-background border border-border shadow-xl">
+                <div className="px-5 py-4 border-b border-border/50">
+                    <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-primary/70">
+                        Incentivise answers
+                    </p>
+                    <h2 className="text-base font-bold text-foreground" style={{ letterSpacing: '-0.02em' }}>
+                        Add a bounty
+                    </h2>
+                </div>
+
+                <div className="px-5 py-5 space-y-4">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                        Bounties are deducted from your reputation immediately and cannot be refunded. The amount will be awarded to the best answer you choose.
+                    </p>
+
+                    <div>
+                        <label className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-1.5 block">
+                            Amount (rep points)
+                        </label>
+                        <Input
+                            type="number" min={50} value={amount}
+                            onChange={e => setAmount(e.target.value)}
+                            placeholder="e.g. 50"
+                            className="h-9 text-sm rounded-none shadow-none border-border/60 focus:border-primary/50"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-1.5 block">
+                            Reason
+                        </label>
+                        <Input
+                            type="text" value={reason}
+                            onChange={e => setReason(e.target.value)}
+                            placeholder="e.g. Needs a detailed canonical answer"
+                            className="h-9 text-sm rounded-none shadow-none border-border/60 focus:border-primary/50"
+                        />
+                    </div>
+
+                    {error && <p className="text-xs text-destructive/80">{error}</p>}
+                </div>
+
+                <div className="px-5 py-4 border-t border-border/50 flex items-center justify-end gap-3">
+                    <Button type="button" variant="ghost" size="sm" onClick={onClose} className="h-8 px-4 text-xs text-muted-foreground">
+                        Cancel
+                    </Button>
+                    <Button type="button" size="sm" onClick={handleSubmit} disabled={isPosting} className="h-8 px-5 text-xs shadow-none">
+                        {isPosting ? 'Posting…' : 'Post bounty'}
+                    </Button>
+                </div>
+            </div>
+        </>
+    )
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function QuestionDetailPage() {
-    const params = useParams();
-    const questionId = params.questionId as string;
-    const { isAuthenticated, user } = useAuthStore();
+    const params     = useParams()
+    const questionId = params.questionId as string
+    const { isAuthenticated, user } = useAuthStore()
     const [isOwn, setIsOwn] = useState(false)
 
-    // State
-    const [question, setQuestion]           = useState<Question | null>(null)
-    const [answers, setAnswers]             = useState<Answer[]>([])
-    const [commentsMap, setCommentsMap]     = useState<Record<string, CommentType[]>>({})
-    const [isLoading, setIsLoading]         = useState(true)
-    const [mounted, setMounted]             = useState(false)
-    const [isEditingQuestion, setIsEditingQuestion] = useState(false)
-    const [questionEditBody, setQuestionEditBody]   = useState<JSONContent>({})
-    const [isSavingQuestion, setIsSavingQuestion]   = useState(false)
-    const [newAnswerBody, setNewAnswerBody]           = useState<JSONContent>({})
-    const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false)
-    const [flagDialogOpen, setFlagDialogOpen] = useState(false);
-    
-    const [isBookmarked, setIsBookmarked]   = useState(false)
-    const [isTogglingBookmark, setIsTogglingBookmark] = useState(false)
+    const [question,           setQuestion]           = useState<Question | null>(null)
+    const [answers,            setAnswers]             = useState<Answer[]>([])
+    const [commentsMap,        setCommentsMap]         = useState<Record<string, CommentType[]>>({})
+    const [isLoading,          setIsLoading]           = useState(true)
+    const [mounted,            setMounted]             = useState(false)
+    const [isEditingQuestion,  setIsEditingQuestion]   = useState(false)
+    const [questionEditBody,   setQuestionEditBody]    = useState<JSONContent>({})
+    const [isSavingQuestion,   setIsSavingQuestion]    = useState(false)
+    const [newAnswerBody,      setNewAnswerBody]        = useState<JSONContent>({})
+    const [isSubmittingAnswer, setIsSubmittingAnswer]  = useState(false)
+    const [flagDialogOpen,     setFlagDialogOpen]      = useState(false)
+    const [isBookmarked,       setIsBookmarked]        = useState(false)
+    const [isTogglingBookmark, setIsTogglingBookmark]  = useState(false)
+    const [bountyDialogOpen,   setBountyDialogOpen]    = useState(false)
 
+    // AlertDialog state — delete question
+    const [deleteDialogOpen,   setDeleteDialogOpen]   = useState(false)
+    const [isDeletingQuestion, setIsDeletingQuestion] = useState(false)
+
+    // AlertDialog state — award bounty (stores the answerId to award to)
+    const [awardTargetId,  setAwardTargetId]  = useState<string | null>(null)
+    const [isAwarding,     setIsAwarding]     = useState(false)
 
     useEffect(() => { setMounted(true) }, [])
 
-    // Fetch data
     useEffect(() => {
         if (!questionId) return
 
-        // Prevent double-counting in development (React strict mode)
-        // and avoid inflating views when the user refreshes the page manually
         const viewedKey = `viewed_qn_${questionId}`
         if (!sessionStorage.getItem(viewedKey)) {
             sessionStorage.setItem(viewedKey, 'true')
-            // Fire view count endpoint silently
             api.post(`/questions/${questionId}/view`).catch(() => {})
         }
 
         const fetchAll = async () => {
             setIsLoading(true)
             try {
-                // Fetch question and answers
                 const [qRes, aRes, cRes] = await Promise.all([
                     api.get(`/questions/${questionId}`),
                     api.get(`/questions/${questionId}/answers`),
                     api.get(`/questions/${questionId}/comments`),
                 ])
-                const qData: Question      = qRes.data.data.question
-                const aData: Answer[]      = aRes.data.data.answers
+                const qData: Question       = qRes.data.data.question
+                const aData: Answer[]       = aRes.data.data.answers
                 const qComments: CommentType[] = cRes.data.data.comments
 
-                setIsOwn(!!currentUserId && qData.author?.authorId === currentUserId);
+                setIsOwn(!!currentUserId && qData.author?.authorId === currentUserId)
+                setQuestion(qData)
+                setAnswers(aData)
 
-                setQuestion(qData); setAnswers(aData)
-
-                // Fetch comments for each answer
                 const aCommentResults = await Promise.all(aData.map(a => api.get(`/answers/${a.id}/comments`)))
                 const map: Record<string, CommentType[]> = { [questionId]: qComments }
-
-                // Map comments to answers
                 aData.forEach((a, i) => { map[a.id] = aCommentResults[i].data.data.comments })
-
-                // Map comments to comments
                 setCommentsMap(map)
 
-                // If authenticated, get bookmark status
                 if (useAuthStore.getState().isAuthenticated) {
                     api.get(`/bookmarks/${questionId}/status`)
                         .then(res => setIsBookmarked(res.data.data.isBookmarked))
                         .catch(() => {})
                 }
-            } catch { toast.error('Failed to load question.') }
-            finally { setIsLoading(false) }
+            } catch {
+                toast.error('Failed to load question.')
+            } finally {
+                setIsLoading(false)
+            }
         }
         fetchAll()
     }, [questionId])
@@ -127,10 +243,28 @@ export default function QuestionDetailPage() {
         setIsSavingQuestion(true)
         try {
             const res = await api.put(`/questions/${questionId}`, { title: question.title, body: questionEditBody, tags: question.tags })
-            setQuestion(res.data.data.question); setIsEditingQuestion(false)
+            setQuestion(res.data.data.question)
+            setIsEditingQuestion(false)
             toast.success('Question updated.')
-        } catch { toast.error('Failed to update question.') }
-        finally { setIsSavingQuestion(false) }
+        } catch {
+            toast.error('Failed to update question.')
+        } finally {
+            setIsSavingQuestion(false)
+        }
+    }
+
+    const handleConfirmDeleteQuestion = async () => {
+        setIsDeletingQuestion(true)
+        try {
+            await api.delete(`/questions/${questionId}`)
+            toast.success('Question deleted.')
+            window.location.href = '/questions'
+        } catch {
+            toast.error('Failed to delete question.')
+        } finally {
+            setIsDeletingQuestion(false)
+            setDeleteDialogOpen(false)
+        }
     }
 
     const handleCreateAnswer = async () => {
@@ -140,31 +274,35 @@ export default function QuestionDetailPage() {
         setIsSubmittingAnswer(true)
         try {
             const res = await api.post(`/questions/${questionId}/answers`, { body: newAnswerBody })
-            setAnswers(prev => [...prev, res.data.data.answer]); setNewAnswerBody({})
+            setAnswers(prev => [...prev, res.data.data.answer])
+            setNewAnswerBody({})
             toast.success('Answer posted.')
-        } catch { toast.error('Failed to post answer.') }
-        finally { setIsSubmittingAnswer(false) }
+        } catch {
+            toast.error('Failed to post answer.')
+        } finally {
+            setIsSubmittingAnswer(false)
+        }
     }
 
     const handleToggleBookmark = async () => {
-        if (!isAuthenticated) return toast.error('Please log in to bookmark.');
-        setIsTogglingBookmark(true);
+        if (!isAuthenticated) return toast.error('Please log in to bookmark.')
+        setIsTogglingBookmark(true)
         try {
             if (isBookmarked) {
-                await api.delete(`/bookmarks/${questionId}`);
-                setIsBookmarked(false);
-                toast.success('Bookmark removed.');
+                await api.delete(`/bookmarks/${questionId}`)
+                setIsBookmarked(false)
+                toast.success('Bookmark removed.')
             } else {
-                await api.post(`/bookmarks/${questionId}`);
-                setIsBookmarked(true);
-                toast.success('Question bookmarked.');
+                await api.post(`/bookmarks/${questionId}`)
+                setIsBookmarked(true)
+                toast.success('Question bookmarked.')
             }
         } catch {
-            toast.error('Failed to update bookmark.');
+            toast.error('Failed to update bookmark.')
         } finally {
-            setIsTogglingBookmark(false);
+            setIsTogglingBookmark(false)
         }
-    };
+    }
 
     const handleAnswerEdited  = useCallback((id: string, updated: Answer) =>
         setAnswers(prev => prev.map(a => a.id === id ? updated : a)), [])
@@ -174,37 +312,53 @@ export default function QuestionDetailPage() {
 
     const handleAccept = useCallback((answerId: string, accepted: boolean) =>
         setAnswers(prev => prev.map(a => ({
-            ...a, isAccepted: a.id === answerId ? accepted : (accepted ? false : a.isAccepted)
+            ...a,
+            isAccepted: a.id === answerId ? accepted : (accepted ? false : a.isAccepted)
         }))), [])
 
-    const handleAwardBounty = async (answerId: string) => {
-        if (!question?.activeBounty) return;
-        if (!confirm('Are you sure you want to award the bounty to this answer? This cannot be undone.')) return;
-        
+    // Called from AnswerCard — opens the confirm dialog instead of browser confirm()
+    const handleRequestAwardBounty = (answerId: string) => {
+        setAwardTargetId(answerId)
+    }
+
+    const handleConfirmAwardBounty = async () => {
+        if (!question?.activeBounty || !awardTargetId) return
+        setIsAwarding(true)
         try {
-            await api.patch(`/bounties/${question.activeBounty.id}/award`, { answerId });
-            toast.success('Bounty awarded successfully!');
-            setQuestion(prev => prev ? { ...prev, activeBounty: null } : null);
-        } catch (error: any) {
-            toast.error(error.response?.data?.message || 'Failed to award bounty.');
+            await api.patch(`/bounties/${question.activeBounty.id}/award`, { answerId: awardTargetId })
+            toast.success('Bounty awarded successfully.')
+            setQuestion(prev => prev ? { ...prev, activeBounty: null } : null)
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || 'Failed to award bounty.')
+        } finally {
+            setIsAwarding(false)
+            setAwardTargetId(null)
         }
-    };
+    }
+
+    const handleBountyAdded = (bounty: { id: string; amount: number; expiresAt: string }) => {
+        setQuestion(prev => prev ? { ...prev, activeBounty: bounty } : null)
+    }
 
     const currentUserId     = user?.id
     const isQuestionAuthor  = !!(question && user?.username === question.author?.username)
     const hasAcceptedAnswer = answers.some(a => a.isAccepted)
     const isModerator       = user?.role === 'admin' || user?.role === 'moderator'
+    const canAddBounty      = isAuthenticated && isQuestionAuthor && !question?.activeBounty
+    const canAwardBounty    = !!question?.activeBounty && isQuestionAuthor
 
     const handleUnfreezeQuestion = async () => {
-        if (!question) return;
+        if (!question) return
         try {
-            await api.patch(`/flags/content/${question.id}/unfreeze`);
-            setQuestion({ ...question, isFrozen: false });
-            toast.success('Question unfrozen.');
+            await api.patch(`/flags/content/${question.id}/unfreeze`)
+            setQuestion({ ...question, isFrozen: false })
+            toast.success('Question unfrozen.')
         } catch {
-            toast.error('Failed to unfreeze question.');
+            toast.error('Failed to unfreeze question.')
         }
-    };
+    }
+
+    // ── Loading ───────────────────────────────────────────────────────────────
 
     if (isLoading) {
         return (
@@ -213,7 +367,7 @@ export default function QuestionDetailPage() {
                 <div className="h-7 w-3/4 bg-muted mb-3" />
                 <div className="h-7 w-1/2 bg-muted mb-6" />
                 <div className="h-px bg-muted mb-6" />
-                {[90,100,80,70,50].map((w,i) => <div key={i} className="h-3 bg-muted mb-3" style={{width:`${w}%`}} />)}
+                {[90, 100, 80, 70, 50].map((w, i) => <div key={i} className="h-3 bg-muted mb-3" style={{ width: `${w}%` }} />)}
             </div>
         )
     }
@@ -231,7 +385,8 @@ export default function QuestionDetailPage() {
         <div className={cn('max-w-3xl mx-auto w-full px-5 py-8 pb-28 transition-opacity duration-500', mounted ? 'opacity-100' : 'opacity-0')}>
 
             <Link href="/questions" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 mb-7 group">
-                <ArrowLeftIcon className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform duration-150" /> All questions
+                <ArrowLeftIcon className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform duration-150" />
+                All questions
             </Link>
 
             {/* ── Question header ── */}
@@ -241,7 +396,9 @@ export default function QuestionDetailPage() {
                 </h1>
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-muted-foreground mb-4">
                     <span>Asked <span className="text-foreground/80 font-medium">{formatDistanceToNow(new Date(question.createdAt), { addSuffix: true })}</span></span>
-                    {question.updatedAt !== question.createdAt && <span className="flex items-center gap-1"><ClockClockwiseIcon className="h-3 w-3" /> Edited</span>}
+                    {question.updatedAt !== question.createdAt && (
+                        <span className="flex items-center gap-1"><ClockClockwiseIcon className="h-3 w-3" /> Edited</span>
+                    )}
                     <span className="flex items-center gap-1"><EyeIcon className="h-3 w-3" /> {question.viewCount} views</span>
                 </div>
                 {question.tags?.length > 0 && (
@@ -251,6 +408,7 @@ export default function QuestionDetailPage() {
                 )}
             </div>
 
+            {/* ── Frozen banner ── */}
             {question.isFrozen && (
                 <div className="mb-7 px-4 py-3 bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 flex flex-wrap items-center justify-between gap-4 w-full">
                     <div className="flex items-center gap-2.5 text-sm font-medium">
@@ -258,11 +416,8 @@ export default function QuestionDetailPage() {
                         This question has been frozen by a moderator and is hidden from the public.
                     </div>
                     {isModerator && (
-                        <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={handleUnfreezeQuestion} 
-                            className="h-8 border-amber-500/30 hover:bg-amber-500/20 text-amber-700 dark:hover:text-amber-300 dark:text-amber-400 shrink-0 shadow-none bg-transparent"
+                        <Button size="sm" variant="outline" onClick={handleUnfreezeQuestion}
+                                className="h-8 border-amber-500/30 hover:bg-amber-500/20 text-amber-700 dark:hover:text-amber-300 dark:text-amber-400 shrink-0 shadow-none bg-transparent"
                         >
                             Unfreeze Content
                         </Button>
@@ -270,13 +425,14 @@ export default function QuestionDetailPage() {
                 </div>
             )}
 
+            {/* ── Active bounty banner ── */}
             {question.activeBounty && (
                 <div className="mb-7 px-4 py-3 bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-400 flex flex-wrap items-center justify-between gap-4 w-full">
                     <div className="flex items-center gap-2.5 text-sm font-medium">
-                        <div className="bg-blue-500 text-white font-bold px-2 py-0.5 rounded text-xs shrink-0">
+                        <div className="bg-blue-500 text-white font-bold px-2 py-0.5 text-xs shrink-0">
                             +{question.activeBounty.amount}
                         </div>
-                        This question has an active bounty expiring {formatDistanceToNow(new Date(question.activeBounty.expiresAt), { addSuffix: true })}.
+                        Active bounty — expires {formatDistanceToNow(new Date(question.activeBounty.expiresAt), { addSuffix: true })}.
                     </div>
                 </div>
             )}
@@ -307,30 +463,53 @@ export default function QuestionDetailPage() {
                                 <div className="flex items-center gap-3">
                                     <ActionBtn
                                         onClick={handleToggleBookmark}
-                                        icon={(props) => <BookmarkSimple {...props} weight={isBookmarked ? "fill" : "regular"} className={cn(props.className, isBookmarked && "text-primary")} />}
+                                        icon={(props) => (
+                                            <BookmarkSimple
+                                                {...props}
+                                                weight={isBookmarked ? 'fill' : 'regular'}
+                                                className={cn(props.className, isBookmarked && 'text-primary')}
+                                            />
+                                        )}
                                         label={isBookmarked ? 'Saved' : 'Save'}
                                     />
+
                                     {isQuestionAuthor && (
                                         <>
-                                            <ActionBtn onClick={() => { setQuestionEditBody(question.body as JSONContent); setIsEditingQuestion(true) }} icon={PencilSimpleLineIcon} label="Edit" />
                                             <ActionBtn
-                                                onClick={async () => {
-                                                    if (!confirm('Delete this question? This cannot be undone.')) return
-                                                    try { await api.delete(`/questions/${questionId}`); toast.success('Question deleted.'); window.location.href = '/questions' }
-                                                    catch { toast.error('Failed to delete question.') }
-                                                }}
-                                                icon={TrashIcon} label="Delete" variant="danger"
+                                                onClick={() => { setQuestionEditBody(question.body as JSONContent); setIsEditingQuestion(true) }}
+                                                icon={PencilSimpleLineIcon}
+                                                label="Edit"
                                             />
+
+                                            {/* Delete — opens AlertDialog */}
+                                            <button
+                                                type="button"
+                                                onClick={() => setDeleteDialogOpen(true)}
+                                                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors duration-150"
+                                            >
+                                                <TrashIcon className="h-3.5 w-3.5" />
+                                                Delete
+                                            </button>
+
+                                            {/* Add bounty */}
+                                            {canAddBounty && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setBountyDialogOpen(true)}
+                                                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-blue-500 transition-colors duration-150"
+                                                >
+                                                    <CurrencyDollarIcon className="h-3.5 w-3.5" />
+                                                    Add bounty
+                                                </button>
+                                            )}
                                         </>
                                     )}
-                                    {/* Flag — shown to authenticated non-owners, next to edit/delete */}
+
                                     {isAuthenticated && !isOwn && (
-                                        <FlagButton
-                                            variant="inline"
-                                            onClick={() => setFlagDialogOpen(true)}
-                                        />
+                                        <FlagButton variant="inline" onClick={() => setFlagDialogOpen(true)} />
                                     )}
                                 </div>
+
                                 <div className="ml-auto flex items-center gap-2.5 bg-primary/5 border border-primary/10 px-3 py-2.5">
                                     <p className="text-[10px] text-muted-foreground/70 leading-none">
                                         asked {new Date(question.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -338,12 +517,16 @@ export default function QuestionDetailPage() {
                                     <UserAvatar author={question.author} size="md" />
                                 </div>
                             </div>
+
                             <div className="mt-5 pt-4 border-t border-border/30">
                                 <CommentThread
-                                    comments={commentsMap[questionId] || []} parentId={questionId} parentType="question"
+                                    comments={commentsMap[questionId] || []}
+                                    parentId={questionId}
+                                    parentType="question"
                                     currentUserId={currentUserId}
                                     recipientId={question.author.authorId}
-                                    onCommentAdded={handleCommentAdded} onCommentEdited={handleCommentEdited}
+                                    onCommentAdded={handleCommentAdded}
+                                    onCommentEdited={handleCommentEdited}
                                     onCommentDeleted={handleCommentDeleted}
                                 />
                             </div>
@@ -370,13 +553,19 @@ export default function QuestionDetailPage() {
                         {answers.map((answer, i) => (
                             <div key={answer.id} className="opacity-0 animate-fade-up" style={{ animationDelay: `${i * 60}ms`, animationFillMode: 'forwards' }}>
                                 <AnswerCard
-                                    answer={answer} isQuestionAuthor={isQuestionAuthor}
-                                    hasAcceptedAnswer={hasAcceptedAnswer} currentUserId={currentUserId}
+                                    answer={answer}
+                                    isQuestionAuthor={isQuestionAuthor}
+                                    hasAcceptedAnswer={hasAcceptedAnswer}
+                                    currentUserId={currentUserId}
                                     comments={commentsMap[answer.id] || []}
-                                    canAwardBounty={!!question.activeBounty && isQuestionAuthor}
-                                    onAwardBounty={handleAwardBounty}
-                                    onAccept={handleAccept} onEdited={handleAnswerEdited} onDeleted={handleAnswerDeleted}
-                                    onCommentAdded={handleCommentAdded} onCommentEdited={handleCommentEdited} onCommentDeleted={handleCommentDeleted}
+                                    canAwardBounty={canAwardBounty}
+                                    onAwardBounty={handleRequestAwardBounty}
+                                    onAccept={handleAccept}
+                                    onEdited={handleAnswerEdited}
+                                    onDeleted={handleAnswerDeleted}
+                                    onCommentAdded={handleCommentAdded}
+                                    onCommentEdited={handleCommentEdited}
+                                    onCommentDeleted={handleCommentDeleted}
                                 />
                             </div>
                         ))}
@@ -393,7 +582,11 @@ export default function QuestionDetailPage() {
                 {isAuthenticated ? (
                     <div className="border border-border/60 overflow-hidden bg-card">
                         <div className="p-5">
-                            <TiptapEditor placeholder="Write a clear, detailed answer. Code examples and context help a lot." onChange={setNewAnswerBody} minHeight="200px" />
+                            <TiptapEditor
+                                placeholder="Write a clear, detailed answer. Code examples and context help a lot."
+                                onChange={setNewAnswerBody}
+                                minHeight="200px"
+                            />
                         </div>
                         <div className="px-5 py-3.5 bg-muted/20 border-t border-border/40 flex justify-end">
                             <Button size="sm" onClick={handleCreateAnswer} disabled={isSubmittingAnswer} className="h-8 px-5 text-xs shadow-none">
@@ -404,7 +597,9 @@ export default function QuestionDetailPage() {
                 ) : (
                     <div className="text-center py-10 border border-dashed border-border/60 bg-muted/10">
                         <p className="text-sm text-muted-foreground mb-3">You must be signed in to answer.</p>
-                        <Button asChild size="sm" className="shadow-none h-8 px-5 text-xs"><Link href="/login">Sign In</Link></Button>
+                        <Button asChild size="sm" className="shadow-none h-8 px-5 text-xs">
+                            <Link href="/login">Sign In</Link>
+                        </Button>
                     </div>
                 )}
             </div>
@@ -414,12 +609,69 @@ export default function QuestionDetailPage() {
                 .animate-fade-up { animation: fade-up 0.4s cubic-bezier(0.22,1,0.36,1) both; }
             `}</style>
 
+            {/* ── Dialogs ── */}
+
             <FlagDialog
                 open={flagDialogOpen}
                 onOpenChange={setFlagDialogOpen}
                 contentId={questionId}
                 contentType="question"
             />
+
+            <AddBountyDialog
+                open={bountyDialogOpen}
+                onClose={() => setBountyDialogOpen(false)}
+                onSuccess={handleBountyAdded}
+                questionId={questionId}
+            />
+
+            {/* Delete question confirmation */}
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete this question?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This question and all its answers and comments will be permanently removed. This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleConfirmDeleteQuestion}
+                            disabled={isDeletingQuestion}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            {isDeletingQuestion ? 'Deleting…' : 'Delete'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Award bounty confirmation */}
+            <AlertDialog open={!!awardTargetId} onOpenChange={open => { if (!open) setAwardTargetId(null) }}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Award bounty to this answer?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {question.activeBounty && (
+                                <>
+                                    <span className="font-semibold text-foreground">{question.activeBounty.amount} reputation</span> will be transferred to the answer author immediately. This cannot be undone.
+                                </>
+                            )}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleConfirmAwardBounty}
+                            disabled={isAwarding}
+                            className="bg-blue-600 text-white hover:bg-blue-700"
+                        >
+                            {isAwarding ? 'Awarding…' : 'Award bounty'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
+import type { Badge, BadgeTier, ReputationHistory, ReputationReason, Tag } from '@/types'
 import {
     PencilSimpleIcon,
     LinkSimpleIcon,
@@ -23,8 +24,12 @@ import {
     CameraIcon,
     XIcon,
     ArrowLeftIcon,
+    ArrowUpRightIcon,
+    ArrowDownRightIcon,
+    ClockIcon,
 } from '@phosphor-icons/react'
-import {Tag} from "@/types";
+
+// ── Interfaces ────────────────────────────────────────────────────────────────
 
 interface UserProfile {
     id: string
@@ -60,18 +65,35 @@ interface UserAnswer {
     isAccepted: boolean
 }
 
-type ActiveTab = 'questions' | 'answers'
+type ActiveTab = 'questions' | 'answers' | 'badges' | 'reputation'
+
+// ── Reputation label helpers ──────────────────────────────────────────────────
+
+const REPUTATION_LABELS: Record<ReputationReason, string> = {
+    QUESTION_UPVOTED:     'Question upvoted',
+    QUESTION_DOWNVOTED:   'Question downvoted',
+    ANSWER_UPVOTED:       'Answer upvoted',
+    ANSWER_DOWNVOTED:     'Answer downvoted',
+    ANSWER_ACCEPTED:      'Answer accepted',
+    ANSWER_UNACCEPTED:    'Answer acceptance removed',
+    BOUNTY_OFFERED:       'Bounty offered',
+    BOUNTY_AWARDED:       'Bounty awarded to you',
+    DOWNVOTE_GIVEN:       'Downvote cast',
+    SPAM_PENALTY:         'Spam penalty',
+    MODERATOR_ADJUSTMENT: 'Moderator adjustment',
+}
+
+// ── Badge tier styles ─────────────────────────────────────────────────────────
+
+const TIER_STYLES: Record<BadgeTier, { ring: string; bg: string; label: string; dot: string }> = {
+    gold:   { ring: 'border-amber-400/60',   bg: 'bg-amber-400/10',   label: 'text-amber-600 dark:text-amber-400',   dot: 'bg-amber-400' },
+    silver: { ring: 'border-slate-400/60',   bg: 'bg-slate-400/10',   label: 'text-slate-600 dark:text-slate-300',   dot: 'bg-slate-400' },
+    bronze: { ring: 'border-orange-700/60',  bg: 'bg-orange-700/10',  label: 'text-orange-700 dark:text-orange-400', dot: 'bg-orange-700' },
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function StatPill({
-                      icon: Icon,
-                      label,
-                      value,
-                  }: {
-    icon: React.ElementType
-    label: string
-    value: string | number
-}) {
+
+function StatPill({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string | number }) {
     return (
         <div className="flex items-center gap-2">
             <Icon className="h-3.5 w-3.5 text-muted-foreground/60 flex-shrink-0" />
@@ -81,42 +103,81 @@ function StatPill({
     )
 }
 
-// ── Avatar ────────────────────────────────────────────────────────────────────
-function ProfileAvatar({
-                           src,
-                           initials,
-                           size = 'lg',
-                       }: {
-    src?: string
-    initials: string
-    size?: 'lg' | 'sm'
-}) {
-    const dim = size === 'lg' ? 'h-20 w-20' : 'h-12 w-12'
+function ProfileAvatar({ src, initials, size = 'lg' }: { src?: string; initials: string; size?: 'lg' | 'sm' }) {
+    const dim  = size === 'lg' ? 'h-20 w-20' : 'h-12 w-12'
     const text = size === 'lg' ? 'text-2xl' : 'text-base'
     return (
-        <div
-            className={cn(
-                dim,
-                'flex-shrink-0 bg-primary/10 border-2 border-primary/20 overflow-hidden',
-                text,
-                'flex items-center justify-center font-bold text-primary'
-            )}
-        >
-            {src ? (
-                <img src={src} alt="avatar" className="h-full w-full object-cover" />
-            ) : (
-                <span>{initials}</span>
-            )}
+        <div className={cn(dim, 'flex-shrink-0 bg-primary/10 border-2 border-primary/20 overflow-hidden', text, 'flex items-center justify-center font-bold text-primary')}>
+            {src ? <img src={src} alt="avatar" className="h-full w-full object-cover" /> : <span>{initials}</span>}
+        </div>
+    )
+}
+
+// ── Badge card ────────────────────────────────────────────────────────────────
+
+function BadgeCard({ badge }: { badge: Badge }) {
+    const s = TIER_STYLES[badge.tier]
+    return (
+        <div className={cn('flex items-start gap-3 p-4 border', s.ring, s.bg)}>
+            <div className={cn('flex-shrink-0 mt-0.5 h-2 w-2', s.dot)} />
+            <div className="flex-1 min-w-0">
+                <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-foreground" style={{ letterSpacing: '-0.01em' }}>
+                        {badge.name}
+                    </span>
+                    <span className={cn('text-[10px] font-bold uppercase tracking-wider', s.label)}>
+                        {badge.tier}
+                    </span>
+                </div>
+                <p className="text-xs text-muted-foreground/70 mt-0.5 leading-snug">
+                    {badge.description}
+                </p>
+                <p className="text-[10px] text-muted-foreground/40 mt-1.5 flex items-center gap-1">
+                    <ClockIcon className="h-3 w-3" />
+                    Earned {formatDistanceToNow(new Date(badge.awardedAt), { addSuffix: true })}
+                </p>
+            </div>
+        </div>
+    )
+}
+
+// ── Reputation row ────────────────────────────────────────────────────────────
+
+function ReputationRow({ entry }: { entry: ReputationHistory }) {
+    const positive = entry.changeAmount > 0
+    return (
+        <div className="flex items-center gap-3 py-3 border-b border-border/30 last:border-0">
+            {/* Change amount */}
+            <div className={cn(
+                'flex-shrink-0 flex items-center gap-0.5 w-14 justify-end font-bold tabular-nums text-sm',
+                positive ? 'text-emerald-500' : 'text-destructive'
+            )}>
+                {positive
+                    ? <ArrowUpRightIcon className="h-3.5 w-3.5" weight="bold" />
+                    : <ArrowDownRightIcon className="h-3.5 w-3.5" weight="bold" />
+                }
+                {positive ? '+' : ''}{entry.changeAmount}
+            </div>
+
+            {/* Label */}
+            <div className="flex-1 min-w-0">
+                <p className="text-xs text-foreground/80">
+                    {REPUTATION_LABELS[entry.reason] ?? entry.reason}
+                </p>
+            </div>
+
+            {/* Time */}
+            <p className="text-[10px] text-muted-foreground/40 flex-shrink-0">
+                {formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true })}
+            </p>
         </div>
     )
 }
 
 // ── Edit drawer ───────────────────────────────────────────────────────────────
+
 function EditDrawer({
-                        open,
-                        profile,
-                        onClose,
-                        onSaved,
+                        open, profile, onClose, onSaved,
                     }: {
     open: boolean
     profile: UserProfile
@@ -124,33 +185,22 @@ function EditDrawer({
     onSaved: (updated: Partial<UserProfile>) => void
 }) {
     const fileInputRef = useRef<HTMLInputElement>(null)
-
-    const [firstName, setFirstName] = useState(profile.firstName ?? '')
-    const [lastName,  setLastName]  = useState(profile.lastName  ?? '')
-    const [bio,       setBio]       = useState(profile.bio       ?? '')
-    const [website,   setWebsite]   = useState(profile.website   ?? '')
-    const [birthDate, setBirthDate] = useState('')
-    const [isSaving, setIsSaving]   = useState(false)
+    const [firstName, setFirstName]           = useState(profile.firstName ?? '')
+    const [lastName, setLastName]             = useState(profile.lastName  ?? '')
+    const [bio, setBio]                       = useState(profile.bio       ?? '')
+    const [website, setWebsite]               = useState(profile.website   ?? '')
+    const [birthDate, setBirthDate]           = useState('')
+    const [isSaving, setIsSaving]             = useState(false)
     const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
-    const [avatarPreview, setAvatarPreview] = useState<string | undefined>(profile.profilePicture)
+    const [avatarPreview, setAvatarPreview]   = useState<string | undefined>(profile.profilePicture)
 
     const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
 
-        // Validate file type
-        if (!file.type.startsWith("image/")) {
-            toast.error("Please select an image file");
-            return;
-        }
+        if (!file.type.startsWith('image/')) { toast.error('Please select an image file.'); return }
+        if (file.size > 5 * 1024 * 1024)     { toast.error('Image size should be less than 5MB.'); return }
 
-        // Validate file size (max 5MB)
-        if (file.size > 5 * 1024 * 1024) {
-            toast.error("Image size should be less than 5MB");
-            return;
-        }
-
-        // Local preview immediately
         const reader = new FileReader()
         reader.onload = () => setAvatarPreview(reader.result as string)
         reader.readAsDataURL(file)
@@ -159,9 +209,7 @@ function EditDrawer({
         try {
             const fd = new FormData()
             fd.append('avatar', file)
-            const res = await api.put('/users/me/avatar', fd, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-            })
+            const res = await api.put('/users/me/avatar', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
             const newPic = res.data?.data?.user?.profilePicture
             if (newPic) {
                 setAvatarPreview(newPic)
@@ -197,58 +245,32 @@ function EditDrawer({
     }
 
     const initials = [profile.firstName, profile.lastName]
-        .filter(Boolean)
-        .map((n) => n![0].toUpperCase())
-        .join('') || profile.username.slice(0, 2).toUpperCase()
+            .filter(Boolean).map((n) => n![0].toUpperCase()).join('') ||
+        profile.username.slice(0, 2).toUpperCase()
 
     return (
         <>
-            {/* Backdrop */}
             <div
-                className={cn(
-                    'fixed inset-0 z-40 bg-black/30 backdrop-blur-sm transition-opacity duration-300',
-                    open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-                )}
+                className={cn('fixed inset-0 z-40 bg-black/30 backdrop-blur-sm transition-opacity duration-300', open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none')}
                 onClick={onClose}
             />
-
-            {/* Drawer */}
-            <div
-                className={cn(
-                    'fixed top-0 right-0 bottom-0 z-50 w-full max-w-sm bg-background border-l border-border/60',
-                    'flex flex-col transition-transform duration-300 ease-out',
-                    open ? 'translate-x-0' : 'translate-x-full'
-                )}
-            >
+            <div className={cn('fixed top-0 right-0 bottom-0 z-50 w-full max-w-sm bg-background border-l border-border/60', 'flex flex-col transition-transform duration-300 ease-out', open ? 'translate-x-0' : 'translate-x-full')}>
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
                     <div>
-                        <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-primary/70">
-                            Your profile
-                        </p>
-                        <h2
-                            className="text-base font-bold text-foreground"
-                            style={{ letterSpacing: '-0.02em' }}
-                        >
-                            Edit details
-                        </h2>
+                        <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-primary/70">Your profile</p>
+                        <h2 className="text-base font-bold text-foreground" style={{ letterSpacing: '-0.02em' }}>Edit details</h2>
                     </div>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="text-muted-foreground hover:text-foreground transition-colors p-1.5"
-                    >
+                    <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors p-1.5">
                         <XIcon className="h-4 w-4" />
                     </button>
                 </div>
 
-                {/* Scrollable body */}
+                {/* Body */}
                 <div className="flex-1 overflow-y-auto px-5 py-6 space-y-6">
                     {/* Avatar */}
                     <div>
-                        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-3">
-                            Profile picture
-                        </p>
+                        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-3">Profile picture</p>
                         <div className="flex items-center gap-4">
                             <div className="relative flex-shrink-0">
                                 <ProfileAvatar src={avatarPreview} initials={initials} size="lg" />
@@ -259,27 +281,12 @@ function EditDrawer({
                                 )}
                             </div>
                             <div>
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    accept="image/png,image/jpeg,image/webp"
-                                    className="hidden"
-                                    onChange={handleAvatarChange}
-                                />
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => fileInputRef.current?.click()}
-                                    disabled={isUploadingAvatar}
-                                    className="h-8 text-xs gap-1.5 shadow-none"
-                                >
+                                <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleAvatarChange} />
+                                <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploadingAvatar} className="h-8 text-xs gap-1.5 shadow-none">
                                     <CameraIcon className="h-3.5 w-3.5" />
                                     Change photo
                                 </Button>
-                                <p className="text-[11px] text-muted-foreground/50 mt-1.5">
-                                    PNG, JPG or WebP · max 5 MB
-                                </p>
+                                <p className="text-[11px] text-muted-foreground/50 mt-1.5">PNG, JPG or WebP · max 5 MB</p>
                             </div>
                         </div>
                     </div>
@@ -288,100 +295,50 @@ function EditDrawer({
 
                     {/* Name */}
                     <div>
-                        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-3">
-                            Name
-                        </p>
+                        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-3">Name</p>
                         <div className="flex gap-2">
                             <div className="flex-1">
                                 <label className="text-xs text-muted-foreground mb-1 block">First</label>
-                                <Input
-                                    value={firstName}
-                                    onChange={(e) => setFirstName(e.target.value)}
-                                    placeholder="First name"
-                                    className="h-8 text-sm rounded-none shadow-none border-border/60"
-                                />
+                                <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" className="h-8 text-sm rounded-none shadow-none border-border/60" />
                             </div>
                             <div className="flex-1">
                                 <label className="text-xs text-muted-foreground mb-1 block">Last</label>
-                                <Input
-                                    value={lastName}
-                                    onChange={(e) => setLastName(e.target.value)}
-                                    placeholder="Last name"
-                                    className="h-8 text-sm rounded-none shadow-none border-border/60"
-                                />
+                                <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" className="h-8 text-sm rounded-none shadow-none border-border/60" />
                             </div>
                         </div>
                     </div>
 
                     {/* Bio */}
                     <div>
-                        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-3">
-                            Bio
-                        </p>
+                        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-3">Bio</p>
                         <textarea
-                            value={bio}
-                            onChange={(e) => setBio(e.target.value)}
+                            value={bio} onChange={(e) => setBio(e.target.value)}
                             placeholder="A short description about yourself…"
-                            rows={4}
-                            maxLength={300}
-                            className={cn(
-                                'w-full text-sm bg-background border border-border/60 px-3 py-2',
-                                'resize-none outline-none transition-colors duration-150',
-                                'focus:border-primary/50 focus:ring-2 focus:ring-primary/10',
-                                'placeholder:text-muted-foreground/40'
-                            )}
+                            rows={4} maxLength={300}
+                            className={cn('w-full text-sm bg-background border border-border/60 px-3 py-2', 'resize-none outline-none transition-colors duration-150', 'focus:border-primary/50 focus:ring-2 focus:ring-primary/10', 'placeholder:text-muted-foreground/40')}
                         />
-                        <p className="text-[11px] text-muted-foreground/40 text-right mt-1">
-                            {bio.length}/300
-                        </p>
+                        <p className="text-[11px] text-muted-foreground/40 text-right mt-1">{bio.length}/300</p>
                     </div>
 
                     {/* Website */}
                     <div>
-                        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-3">
-                            Website
-                        </p>
-                        <Input
-                            value={website}
-                            onChange={(e) => setWebsite(e.target.value)}
-                            placeholder="https://yoursite.com"
-                            type="url"
-                            className="h-8 text-sm rounded-none shadow-none border-border/60"
-                        />
+                        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-3">Website</p>
+                        <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://yoursite.com" type="url" className="h-8 text-sm rounded-none shadow-none border-border/60" />
                     </div>
 
                     {/* Birth date */}
                     <div>
-                        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-3">
-                            Date of birth
-                        </p>
-                        <Input
-                            value={birthDate}
-                            onChange={(e) => setBirthDate(e.target.value)}
-                            type="date"
-                            className="h-8 text-sm rounded-none shadow-none border-border/60"
-                        />
+                        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-3">Date of birth</p>
+                        <Input value={birthDate} onChange={(e) => setBirthDate(e.target.value)} type="date" className="h-8 text-sm rounded-none shadow-none border-border/60" />
                     </div>
                 </div>
 
                 {/* Footer */}
                 <div className="px-5 py-4 border-t border-border/50 flex items-center justify-end gap-3">
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={onClose}
-                        className="h-8 px-5 text-xs text-muted-foreground"
-                    >
+                    <Button type="button" variant="ghost" size="sm" onClick={onClose} className="h-8 px-5 text-xs text-muted-foreground">
                         Cancel
                     </Button>
-                    <Button
-                        type="button"
-                        size="sm"
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className="h-8 px-5 text-xs shadow-none"
-                    >
+                    <Button type="button" size="sm" onClick={handleSave} disabled={isSaving} className="h-8 px-5 text-xs shadow-none">
                         {isSaving ? 'Saving…' : 'Save changes'}
                     </Button>
                 </div>
@@ -391,26 +348,34 @@ function EditDrawer({
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function UserProfilePage() {
-    const params  = useParams()
-    const username = params.username as string
+    const params   = useParams()
+    const username  = params.username as string
     const { user: authUser, isAuthenticated } = useAuthStore()
 
-    const [profile,   setProfile]   = useState<UserProfile | null>(null)
-    const [questions, setQuestions] = useState<UserQuestion[]>([])
-    const [answers,   setAnswers]   = useState<UserAnswer[]>([])
-    const [activeTab, setActiveTab] = useState<ActiveTab>('questions')
-    const [isLoading, setIsLoading] = useState(true)
-    const [mounted,   setMounted]   = useState(false)
-    const [editOpen,  setEditOpen]  = useState(false)
+    const [profile,     setProfile]     = useState<UserProfile | null>(null)
+    const [questions,   setQuestions]   = useState<UserQuestion[]>([])
+    const [answers,     setAnswers]     = useState<UserAnswer[]>([])
+    const [badges,      setBadges]      = useState<Badge[]>([])
+    const [reputation,  setReputation]  = useState<ReputationHistory[]>([])
+    const [activeTab,   setActiveTab]   = useState<ActiveTab>('questions')
+    const [isLoading,   setIsLoading]   = useState(true)
+    const [mounted,     setMounted]     = useState(false)
+    const [editOpen,    setEditOpen]    = useState(false)
+
+    // Track if auxiliary tabs have been fetched yet (lazy load)
+    const [badgesFetched,     setBadgesFetched]     = useState(false)
+    const [reputationFetched, setReputationFetched] = useState(false)
 
     const isOwnProfile = isAuthenticated && authUser?.username === username
 
     useEffect(() => { setMounted(true) }, [])
 
+    // Initial data fetch — profile, questions, answers
     useEffect(() => {
         if (!username) return
-        const fetchAll = async () => {
+        const fetchCore = async () => {
             setIsLoading(true)
             try {
                 const [profileRes, questionsRes, answersRes] = await Promise.all([
@@ -427,11 +392,41 @@ export default function UserProfilePage() {
                 setIsLoading(false)
             }
         }
-        fetchAll()
+        fetchCore()
     }, [username])
 
+    // Lazy-fetch badges when tab is activated
+    useEffect(() => {
+        if (activeTab !== 'badges' || badgesFetched || !profile) return
+        const fetchBadges = async () => {
+            try {
+                const res = await api.get(`/users/${username}/badges`)
+                setBadges(res.data.data.badges ?? [])
+                setBadgesFetched(true)
+            } catch {
+                toast.error('Failed to load badges.')
+            }
+        }
+        fetchBadges()
+    }, [activeTab, badgesFetched, profile, username])
+
+    // Lazy-fetch reputation history when tab is activated (own profile only)
+    useEffect(() => {
+        if (activeTab !== 'reputation' || reputationFetched || !isOwnProfile) return
+        const fetchReputation = async () => {
+            try {
+                const res = await api.get('/users/me/reputation')
+                setReputation(res.data.data.history ?? [])
+                setReputationFetched(true)
+            } catch {
+                toast.error('Failed to load reputation history.')
+            }
+        }
+        fetchReputation()
+    }, [activeTab, reputationFetched, isOwnProfile])
+
     const handleProfileSaved = (updated: Partial<UserProfile>) => {
-        setProfile((prev) => prev ? { ...prev, ...updated } : prev)
+        setProfile((prev) => (prev ? { ...prev, ...updated } : prev))
     }
 
     const displayName = profile
@@ -439,11 +434,24 @@ export default function UserProfilePage() {
         : username
 
     const initials = profile
-        ? ([profile.firstName, profile.lastName].filter(Boolean).map((n) => n![0].toUpperCase()).join('') ||
-            profile.username.slice(0, 2).toUpperCase())
+        ? ([profile.firstName, profile.lastName].filter(Boolean).map((n) => n![0].toUpperCase()).join('') || profile.username.slice(0, 2).toUpperCase())
         : username.slice(0, 2).toUpperCase()
 
+    // Group badges by tier for the display
+    const groupedBadges = badges.reduce<Record<BadgeTier, Badge[]>>(
+        (acc, badge) => { acc[badge.tier] = [...(acc[badge.tier] || []), badge]; return acc },
+        { gold: [], silver: [], bronze: [] }
+    )
+
+    const TABS: { key: ActiveTab; label: string; count?: number }[] = [
+        { key: 'questions',  label: 'Questions',  count: questions.length },
+        { key: 'answers',    label: 'Answers',    count: answers.length },
+        { key: 'badges',     label: 'Badges',     count: profile?.badgeCount },
+        ...(isOwnProfile ? [{ key: 'reputation' as ActiveTab, label: 'Reputation' }] : []),
+    ]
+
     // ── Loading skeleton ──────────────────────────────────────────────────────
+
     if (isLoading) {
         return (
             <div className="max-w-3xl mx-auto w-full px-5 py-8 animate-pulse">
@@ -456,9 +464,7 @@ export default function UserProfilePage() {
                     </div>
                 </div>
                 <div className="h-px bg-muted mb-6" />
-                {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="h-14 bg-muted mb-3" />
-                ))}
+                {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-14 bg-muted mb-3" />)}
             </div>
         )
     }
@@ -467,26 +473,17 @@ export default function UserProfilePage() {
         return (
             <div className="max-w-3xl mx-auto w-full px-5 py-20 text-center">
                 <p className="text-muted-foreground mb-3">User not found.</p>
-                <Link href="/questions" className="text-sm text-primary hover:underline">
-                    Back to questions
-                </Link>
+                <Link href="/questions" className="text-sm text-primary hover:underline">Back to questions</Link>
             </div>
         )
     }
 
     return (
         <>
-            <div
-                className={cn(
-                    'max-w-3xl mx-auto w-full px-5 py-8 transition-opacity duration-500',
-                    mounted ? 'opacity-100' : 'opacity-0'
-                )}
-            >
+            <div className={cn('max-w-3xl mx-auto w-full px-5 py-8 transition-opacity duration-500', mounted ? 'opacity-100' : 'opacity-0')}>
+
                 {/* ── Back ── */}
-                <Link
-                    href="/questions"
-                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 mb-7 group"
-                >
+                <Link href="/questions" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 mb-7 group">
                     <ArrowLeftIcon className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform duration-150" />
                     All questions
                 </Link>
@@ -498,10 +495,7 @@ export default function UserProfilePage() {
                     <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-3 flex-wrap">
                             <div>
-                                <h1
-                                    className="text-2xl font-bold text-foreground leading-tight"
-                                    style={{ letterSpacing: '-0.03em' }}
-                                >
+                                <h1 className="text-2xl font-bold text-foreground leading-tight" style={{ letterSpacing: '-0.03em' }}>
                                     {displayName}
                                 </h1>
                                 <p className="text-sm text-muted-foreground mt-0.5">
@@ -513,36 +507,23 @@ export default function UserProfilePage() {
                                     )}
                                 </p>
                             </div>
-
                             {isOwnProfile && (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => setEditOpen(true)}
-                                    className="gap-1.5 h-8 text-xs shadow-none"
-                                >
+                                <Button size="sm" variant="outline" onClick={() => setEditOpen(true)} className="gap-1.5 h-8 text-xs shadow-none">
                                     <PencilSimpleIcon className="h-3.5 w-3.5" />
                                     Edit profile
                                 </Button>
                             )}
                         </div>
 
-                        {/* Bio */}
                         {profile.bio && (
                             <p className="text-sm text-muted-foreground mt-3 leading-relaxed max-w-md">
                                 {profile.bio}
                             </p>
                         )}
 
-                        {/* Meta row */}
                         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-3">
                             {profile.website && (
-                                <a
-                                    href={profile.website}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline underline-offset-2"
-                                >
+                                <a href={profile.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline underline-offset-2">
                                     <LinkSimpleIcon className="h-3.5 w-3.5 flex-shrink-0" />
                                     {profile.website.replace(/^https?:\/\//, '')}
                                 </a>
@@ -557,36 +538,38 @@ export default function UserProfilePage() {
 
                 {/* ── Stats bar ── */}
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2 py-4 px-5 bg-muted/20 border border-border/40 mb-7">
-                    <StatPill icon={TrophyIcon}    label="reputation" value={profile.reputationPoints.toLocaleString()} />
-                    <StatPill icon={MedalIcon}     label="badges"     value={profile.badgeCount} />
-                    <StatPill icon={ChatDotsIcon}  label="questions"  value={questions.length} />
-                    <StatPill icon={ArrowUpIcon}   label="answers"    value={answers.length} />
+                    <StatPill icon={TrophyIcon}   label="reputation" value={profile.reputationPoints.toLocaleString()} />
+                    <StatPill icon={MedalIcon}    label="badges"     value={profile.badgeCount} />
+                    <StatPill icon={ChatDotsIcon} label="questions"  value={questions.length} />
+                    <StatPill icon={ArrowUpIcon}  label="answers"    value={answers.length} />
                 </div>
 
                 {/* ── Tabs ── */}
                 <div className="flex items-center gap-0 border-b border-border/40 mb-5">
-                    {(['questions', 'answers'] as ActiveTab[]).map((tab) => (
+                    {TABS.map((tab) => (
                         <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab)}
+                            key={tab.key}
+                            onClick={() => setActiveTab(tab.key)}
                             className={cn(
                                 'px-4 py-2.5 text-xs font-medium capitalize transition-colors duration-150 border-b-2 -mb-px',
-                                activeTab === tab
+                                activeTab === tab.key
                                     ? 'border-primary text-primary'
                                     : 'border-transparent text-muted-foreground hover:text-foreground'
                             )}
                         >
-                            {tab}
-                            <span className="ml-1.5 text-[10px] tabular-nums text-muted-foreground/60">
-                                ({tab === 'questions' ? questions.length : answers.length})
-                            </span>
+                            {tab.label}
+                            {tab.count !== undefined && (
+                                <span className="ml-1.5 text-[10px] tabular-nums text-muted-foreground/60">
+                                    ({tab.count})
+                                </span>
+                            )}
                         </button>
                     ))}
                 </div>
 
                 {/* ── Questions tab ── */}
                 {activeTab === 'questions' && (
-                    <div className="flex flex-col">
+                    <div className="flex flex-col" id={`questions`}>
                         {questions.length === 0 ? (
                             <div className="text-center py-16 border border-dashed border-border/50">
                                 <p className="text-sm text-muted-foreground">No questions yet.</p>
@@ -598,7 +581,6 @@ export default function UserProfilePage() {
                                     className="group flex gap-4 py-4 border-b border-border/40 last:border-0 hover:bg-muted/20 -mx-3 px-3 transition-colors duration-150 opacity-0 animate-fade-up"
                                     style={{ animationDelay: `${i * 35}ms`, animationFillMode: 'forwards' }}
                                 >
-                                    {/* Mini stats */}
                                     <div className="hidden sm:flex flex-col items-end gap-1.5 flex-shrink-0 w-14 pt-0.5 text-right">
                                         <span className={cn('text-xs font-bold tabular-nums', q.voteScore > 0 ? 'text-primary' : 'text-muted-foreground/60')}>
                                             {q.voteScore} <span className="font-normal text-muted-foreground/50">votes</span>
@@ -607,18 +589,13 @@ export default function UserProfilePage() {
                                             {q.answersCount} <span className="font-normal text-muted-foreground/50">ans</span>
                                         </span>
                                     </div>
-
                                     <div className="flex-1 min-w-0">
-                                        <Link
-                                            href={`/questions/${q.id}`}
-                                            className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors duration-150 line-clamp-1"
-                                            style={{ letterSpacing: '-0.01em' }}
-                                        >
+                                        <Link href={`/questions/${q.id}`} className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors duration-150 line-clamp-1" style={{ letterSpacing: '-0.01em' }}>
                                             {q.title}
                                         </Link>
                                         <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                                             {q.tags?.slice(0, 4).map((tag) => (
-                                                <TagBadge key={tag["tag_id"]} tag={tag} />
+                                                <TagBadge key={tag['tag_id']} tag={tag} />
                                             ))}
                                             <span className="text-[11px] text-muted-foreground/50 ml-auto">
                                                 {formatDistanceToNow(new Date(q.createdAt), { addSuffix: true })}
@@ -633,7 +610,7 @@ export default function UserProfilePage() {
 
                 {/* ── Answers tab ── */}
                 {activeTab === 'answers' && (
-                    <div className="flex flex-col">
+                    <div className="flex flex-col" id={`answers`}>
                         {answers.length === 0 ? (
                             <div className="text-center py-16 border border-dashed border-border/50">
                                 <p className="text-sm text-muted-foreground">No answers yet.</p>
@@ -645,33 +622,107 @@ export default function UserProfilePage() {
                                     className="group flex gap-4 py-4 border-b border-border/40 last:border-0 hover:bg-muted/20 -mx-3 px-3 transition-colors duration-150 opacity-0 animate-fade-up"
                                     style={{ animationDelay: `${i * 35}ms`, animationFillMode: 'forwards' }}
                                 >
-                                    {/* Mini stats */}
                                     <div className="hidden sm:flex flex-col items-end gap-1.5 flex-shrink-0 w-14 pt-0.5 text-right">
                                         <span className={cn('text-xs font-bold tabular-nums', a.voteScore > 0 ? 'text-primary' : 'text-muted-foreground/60')}>
                                             {a.voteScore} <span className="font-normal text-muted-foreground/50">votes</span>
                                         </span>
-                                        {a.isAccepted && (
-                                            <CheckCircleIcon weight="fill" className="h-3.5 w-3.5 text-emerald-500 ml-auto" />
-                                        )}
+                                        {a.isAccepted && <CheckCircleIcon weight="fill" className="h-3.5 w-3.5 text-emerald-500 ml-auto" />}
                                     </div>
-
                                     <div className="flex-1 min-w-0">
-                                        <Link
-                                            href={`/questions/${a.questionId}`}
-                                            className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors duration-150 line-clamp-1"
-                                            style={{ letterSpacing: '-0.01em' }}
-                                        >
+                                        <Link href={`/questions/${a.questionId}`} className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors duration-150 line-clamp-1" style={{ letterSpacing: '-0.01em' }}>
                                             {a.questionTitle}
                                         </Link>
                                         <p className="text-[11px] text-muted-foreground/50 mt-1">
                                             {formatDistanceToNow(new Date(a.createdAt), { addSuffix: true })}
-                                            {a.isAccepted && (
-                                                <span className="ml-2 text-emerald-500 font-medium">· accepted</span>
-                                            )}
+                                            {a.isAccepted && <span className="ml-2 text-emerald-500 font-medium">· accepted</span>}
                                         </p>
                                     </div>
                                 </div>
                             ))
+                        )}
+                    </div>
+                )}
+
+                {/* ── Badges tab ── */}
+                {activeTab === 'badges' && (
+                    <div id={`badges`}>
+                        {!badgesFetched ? (
+                            // skeleton
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {Array.from({ length: 4 }).map((_, i) => (
+                                    <div key={i} className="h-24 bg-muted animate-pulse" />
+                                ))}
+                            </div>
+                        ) : badges.length === 0 ? (
+                            <div className="text-center py-16 border border-dashed border-border/50">
+                                <MedalIcon className="h-8 w-8 text-muted-foreground/20 mx-auto mb-3" />
+                                <p className="text-sm text-muted-foreground">No badges earned yet.</p>
+                                <p className="text-xs text-muted-foreground/50 mt-1">Keep contributing to earn your first badge.</p>
+                            </div>
+                        ) : (
+                            // Group by tier: gold → silver → bronze
+                            (['gold', 'silver', 'bronze'] as BadgeTier[]).map((tier) => {
+                                const tierBadges = groupedBadges[tier]
+                                if (!tierBadges.length) return null
+                                const s = TIER_STYLES[tier]
+                                return (
+                                    <div key={tier} className="mb-7">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <div className={cn('h-2 w-2', s.dot)} />
+                                            <p className={cn('text-[10px] font-bold tracking-[0.15em] uppercase', s.label)}>
+                                                {tier} · {tierBadges.length}
+                                            </p>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            {tierBadges.map((badge, i) => (
+                                                <div
+                                                    key={badge.badgeId}
+                                                    className="opacity-0 animate-fade-up"
+                                                    style={{ animationDelay: `${i * 40}ms`, animationFillMode: 'forwards' }}
+                                                >
+                                                    <BadgeCard badge={badge} />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )
+                            })
+                        )}
+                    </div>
+                )}
+
+                {/* ── Reputation tab (own profile only) ── */}
+                {activeTab === 'reputation' && isOwnProfile && (
+                    <div id={`reputations`}>
+                        {/* Running total banner */}
+                        <div className="flex items-center justify-between px-4 py-3 bg-muted/20 border border-border/40 mb-5">
+                            <div>
+                                <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-muted-foreground/60">Current total</p>
+                                <p className="text-2xl font-bold text-foreground tabular-nums" style={{ letterSpacing: '-0.03em' }}>
+                                    {profile.reputationPoints.toLocaleString()}
+                                </p>
+                            </div>
+                            <TrophyIcon className="h-8 w-8 text-primary/20" weight="fill" />
+                        </div>
+
+                        {!reputationFetched ? (
+                            <div className="space-y-px">
+                                {Array.from({ length: 6 }).map((_, i) => (
+                                    <div key={i} className="h-12 bg-muted animate-pulse" style={{ opacity: 1 - i * 0.12 }} />
+                                ))}
+                            </div>
+                        ) : reputation.length === 0 ? (
+                            <div className="text-center py-16 border border-dashed border-border/50">
+                                <TrophyIcon className="h-8 w-8 text-muted-foreground/20 mx-auto mb-3" />
+                                <p className="text-sm text-muted-foreground">No reputation history yet.</p>
+                                <p className="text-xs text-muted-foreground/50 mt-1">Start by asking or answering questions.</p>
+                            </div>
+                        ) : (
+                            <div className="opacity-0 animate-fade-up" style={{ animationFillMode: 'forwards' }}>
+                                {reputation.map((entry) => (
+                                    <ReputationRow key={entry.historyId} entry={entry} />
+                                ))}
+                            </div>
                         )}
                     </div>
                 )}

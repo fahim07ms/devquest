@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MagnifyingGlassIcon, MoonIcon, SunIcon, PencilSimpleIcon } from '@phosphor-icons/react'
 import { useTheme } from 'next-themes'
+import { NotificationDropdown } from '@/components/notifications/NotificationDropdown'
 
 export function Navbar() {
     const router = useRouter()
@@ -36,7 +37,8 @@ export function Navbar() {
             {/* Search */}
             <form onSubmit={handleSearch} className="flex-1 max-w-md">
                 <div className="relative">
-                    <MagnifyingGlassIcon className={`absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 transition-colors duration-150 ${
+                    <MagnifyingGlassIcon
+                        className={`absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 transition-colors duration-150 ${
                             focused ? 'text-primary' : 'text-muted-foreground'
                         }`}
                     />
@@ -70,10 +72,16 @@ export function Navbar() {
                         </Link>
                     </Button>
                 ) : (
-                    <Button onClick={() => (router.push('/register'))} className={`h-8 gap-1.5 hidden sm:flex text-xs px-3 shadow-none cursor-pointer`}>
+                    <Button
+                        onClick={() => router.push('/register')}
+                        className="h-8 gap-1.5 hidden sm:flex text-xs px-3 shadow-none cursor-pointer"
+                    >
                         Join Now
                     </Button>
                 )}
+
+                {/* Notification bell — authenticated users only */}
+                {isAuthenticated && <NotificationDropdown />}
 
                 {/* Theme toggle */}
                 <button

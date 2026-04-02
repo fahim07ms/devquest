@@ -24,62 +24,87 @@ import {
     HouseIcon,
     ListBulletsIcon,
     TagIcon,
-    UsersIcon,
     BookmarkSimpleIcon,
     TrophyIcon,
     SignOutIcon,
+    FlagIcon,
 } from '@phosphor-icons/react'
-import {Button} from "@/components/ui/button";
+import { Button } from '@/components/ui/button'
 
 const navItems = [
-    { label: 'Home', href: '/', icon: HouseIcon },
-    { label: 'Questions', href: '/questions', icon: ListBulletsIcon },
-    { label: 'Tags', href: '/tags', icon: TagIcon },
-    { label: 'Users', href: '/users', icon: UsersIcon },
+    { label: 'Home',      href: '/',          icon: HouseIcon },
+    { label: 'Questions', href: '/questions',  icon: ListBulletsIcon },
+    { label: 'Tags',      href: '/tags',       icon: TagIcon },
 ]
 
 const userItems = [
-    { label: 'Bookmarks', href: '/bookmarks', icon: BookmarkSimpleIcon },
+    { label: 'Bookmarks',  href: '/bookmarks',  icon: BookmarkSimpleIcon },
     { label: 'Reputation', href: '/reputation', icon: TrophyIcon },
+]
+
+const modItems = [
+    { label: 'Flags', href: '/flags', icon: FlagIcon },
 ]
 
 export function AppSidebar() {
     const pathname = usePathname()
-    const router = useRouter()
+    const router   = useRouter()
     const { user, logout, isAuthenticated } = useAuthStore()
 
+    const isMod = user?.role === 'admin' || user?.role === 'moderator'
+
     const handleLogout = async () => {
-        try {
-            await api.get('/auth/logout')
-        } catch (_) {}
+        try { await api.get('/auth/logout') } catch (_) {}
         logout()
         toast.success('Logged out successfully')
         router.push('/login')
     }
 
-    const initials = [user?.firstName, user?.lastName]
-        .filter(Boolean)
-        .map((n) => n![0].toUpperCase())
-        .join('') || user?.username?.slice(0, 2).toUpperCase() || 'DQ'
+    const initials =
+        [user?.firstName, user?.lastName]
+            .filter(Boolean)
+            .map((n) => n![0].toUpperCase())
+            .join('') ||
+        user?.username?.slice(0, 2).toUpperCase() ||
+        'DQ'
+
+    const NavLink = ({ label, href, icon: Icon }: { label: string; href: string; icon: React.ElementType }) => {
+        const isActive =
+            pathname === href ||
+            (label === 'Questions' && pathname.startsWith('/questions'))
+        return (
+            <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={isActive}>
+                    <Link
+                        href={href}
+                        className={cn(
+                            'flex items-center gap-3 px-3 py-2 text-sm font-medium transition-all duration-150',
+                            isActive
+                                ? 'bg-primary/10 text-primary'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                        )}
+                    >
+                        <Icon weight={isActive ? 'duotone' : 'regular'} className="h-4 w-4 flex-shrink-0" />
+                        {label}
+                        {isActive && <span className="ml-auto h-1.5 w-1.5 bg-primary" />}
+                    </Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+        )
+    }
 
     return (
         <Sidebar className="border-r border-sidebar-border">
             {/* ── Brand ── */}
             <SidebarHeader className="px-5 py-5">
                 <Link href="/questions" className="group flex items-baseline gap-0">
-                    <span
-                        className="text-xl font-bold text-foreground group-hover:text-primary transition-colors duration-200"
-                        style={{ letterSpacing: '-0.04em' }}
-                    >
+                    <span className="text-xl font-bold text-foreground group-hover:text-primary transition-colors duration-200" style={{ letterSpacing: '-0.04em' }}>
                         dev
                     </span>
-                    <span
-                        className="text-xl font-bold text-primary"
-                        style={{ letterSpacing: '-0.04em' }}
-                    >
+                    <span className="text-xl font-bold text-primary" style={{ letterSpacing: '-0.04em' }}>
                         quest
                     </span>
-                    <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-primary mb-0.5 self-end" />
+                    <span className="ml-0.5 h-1.5 w-1.5 bg-primary mb-0.5 self-end" />
                 </Link>
             </SidebarHeader>
 
@@ -88,88 +113,54 @@ export function AppSidebar() {
             <SidebarContent className="px-2 py-3">
                 {/* ── Main nav ── */}
                 <SidebarGroup>
-                    <SidebarGroupLabel
-                        className="px-3 mb-1 text-[10px] font-semibold tracking-[0.14em] uppercase text-muted-foreground/60"
-                    >
+                    <SidebarGroupLabel className="px-3 mb-1 text-[10px] font-semibold tracking-[0.14em] uppercase text-muted-foreground/60">
                         Navigate
                     </SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu className="gap-0.5">
-                            {navItems.map(({ label, href, icon: Icon }) => {
-                                const isActive =
-                                    pathname === href ||
-                                    (label === 'Questions' && pathname.startsWith('/questions'))
-                                return (
-                                    <SidebarMenuItem key={label}>
-                                        <SidebarMenuButton asChild isActive={isActive}>
-                                            <Link
-                                                href={href}
-                                                className={cn(
-                                                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150',
-                                                    isActive
-                                                        ? 'bg-primary/10 text-primary'
-                                                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
-                                                )}
-                                            >
-                                                <Icon
-                                                    weight={isActive ? 'duotone' : 'regular'}
-                                                    className="h-4 w-4 flex-shrink-0"
-                                                />
-                                                {label}
-                                                {isActive && (
-                                                    <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
-                                                )}
-                                            </Link>
-                                        </SidebarMenuButton>
-                                    </SidebarMenuItem>
-                                )
-                            })}
+                            {navItems.map((item) => <NavLink key={item.label} {...item} />)}
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
 
-                <div className="my-3 mx-3 h-px bg-border/50" />
-
                 {/* ── User activity ── */}
                 {isAuthenticated && (
-                    <SidebarGroup>
-                        <SidebarGroupLabel
-                            className="px-3 mb-1 text-[10px] font-semibold tracking-[0.14em] uppercase text-muted-foreground/60"
-                        >
-                            My Activity
-                        </SidebarGroupLabel>
-                        <SidebarGroupContent>
-                            <SidebarMenu className="gap-0.5">
-                                {userItems.map(({ label, href, icon: Icon }) => {
-                                    const isActive = pathname === href
-                                    return (
-                                        <SidebarMenuItem key={label}>
-                                            <SidebarMenuButton asChild isActive={isActive}>
-                                                <Link
-                                                    href={href}
-                                                    className={cn(
-                                                        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150',
-                                                        isActive
-                                                            ? 'bg-primary/10 text-primary'
-                                                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
-                                                    )}
-                                                >
-                                                    <Icon
-                                                        weight={isActive ? 'duotone' : 'regular'}
-                                                        className="h-4 w-4 flex-shrink-0"
-                                                    />
-                                                    {label}
-                                                    {isActive && (
-                                                        <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
-                                                    )}
-                                                </Link>
-                                            </SidebarMenuButton>
-                                        </SidebarMenuItem>
-                                    )
-                                })}
-                            </SidebarMenu>
-                        </SidebarGroupContent>
-                    </SidebarGroup>
+                    <>
+                        <div className="my-3 mx-3 h-px bg-border/50" />
+                        <SidebarGroup>
+                            <SidebarGroupLabel className="px-3 mb-1 text-[10px] font-semibold tracking-[0.14em] uppercase text-muted-foreground/60">
+                                My Activity
+                            </SidebarGroupLabel>
+                            <SidebarGroupContent>
+                                <SidebarMenu className="gap-0.5">
+                                    {userItems.map((item) => {
+                                        if (item.label === 'Reputation') {
+                                            item.href = `/users/${user?.username}`
+                                        }
+
+                                        return <NavLink key={item.label} {...item} />
+                                    })}
+                                </SidebarMenu>
+                            </SidebarGroupContent>
+                        </SidebarGroup>
+                    </>
+                )}
+
+                {/* ── Moderator / Admin ── */}
+                {isMod && (
+                    <>
+                        <div className="my-3 mx-3 h-px bg-border/50" />
+                        <SidebarGroup>
+                            <SidebarGroupLabel className="px-3 mb-1 text-[10px] font-semibold tracking-[0.14em] uppercase text-muted-foreground/60">
+                                Moderation
+                            </SidebarGroupLabel>
+                            <SidebarGroupContent>
+                                <SidebarMenu className="gap-0.5">
+                                    {modItems.map((item) => <NavLink key={item.label} {...item} />)}
+                                </SidebarMenu>
+                            </SidebarGroupContent>
+                        </SidebarGroup>
+                    </>
                 )}
             </SidebarContent>
 
@@ -177,8 +168,8 @@ export function AppSidebar() {
             <SidebarFooter className="p-3">
                 <div className="h-px bg-border/50 mb-3" />
                 {isAuthenticated ? (
-                    <div className="flex items-center justify-between rounded-xl px-3 py-2.5 bg-muted/30 hover:bg-muted/50 transition-colors duration-150">
-                        <Link href={`/users/${user?.username}`} className={`flex items-center text-sm font-medium transition-colors duration-150`}>
+                    <div className="flex items-center justify-between px-3 py-2.5 bg-muted/30 hover:bg-muted/50 transition-colors duration-150">
+                        <Link href={`/users/${user?.username}`} className="flex items-center gap-2.5 flex-1 min-w-0">
                             <Avatar className="h-8 w-8 ring-2 ring-primary/15 flex-shrink-0">
                                 <AvatarImage src={user?.profilePicture || ''} alt={user?.username} />
                                 <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
@@ -194,14 +185,14 @@ export function AppSidebar() {
                         </Link>
                         <button
                             onClick={handleLogout}
-                            className="text-muted-foreground/60 hover:text-destructive transition-colors duration-150 rounded-md p-1.5 hover:bg-destructive/10 flex-shrink-0"
+                            className="text-muted-foreground/60 hover:text-destructive transition-colors duration-150 p-1.5 hover:bg-destructive/10 flex-shrink-0"
                             title="Logout"
                         >
                             <SignOutIcon className="h-4 w-4" />
                         </button>
                     </div>
                 ) : (
-                    <Button className={"cursor-pointer hover:bg-primary/80"} onClick={() => (router.push('/login'))}>
+                    <Button className="cursor-pointer hover:bg-primary/80 w-full" onClick={() => router.push('/login')}>
                         Sign In
                     </Button>
                 )}
