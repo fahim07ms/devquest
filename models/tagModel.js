@@ -34,7 +34,62 @@ const getDetailedTags = async ({ offset, limit, search }) => {
     }
 }
 
+// Get all tags followed by a specific user
+const getFollowedTags = async (userId) => {
+    const result = await pool.query(
+        `SELECT
+            t.tag_id,
+            t.name,
+            t.description,
+            COUNT(qt.question_id) AS "questionCount",
+            utf.followed_at        AS "followedAt"
+        FROM user_tag_follow utf
+        JOIN tag t ON utf.tag_id = t.tag_id
+        LEFT JOIN question_tag qt ON qt.tag_id = t.tag_id
+        WHERE utf.user_id = $1
+        GROUP BY t.tag_id, t.name, t.description, utf.followed_at
+        ORDER BY utf.followed_at DESC`,
+        [userId]
+    );
+    return result.rows;
+};
+
+// Get just the tag IDs a user follows
+const getFollowedTagIds = async (userId) => {
+    const result = await pool.query(
+        `SELECT tag_id FROM user_tag_follow WHERE user_id = $1`,
+        [userId]
+    );
+    return result.rows.map(r => r.tag_id);
+};
+
+// Follow a tag
+const followTag = async (userId, tagId) => {
+    // Verify the tag exists first
+    const tagCheck = await pool.query(`SELECT tag_id FROM tag WHERE tag_id = $1`, [tagId]);
+    if (tagCheck.rowCount === 0) throw new Error('TAG_NOT_FOUND');
+    
+    await pool.query(
+        `INSERT INTO user_tag_follow (user_id, tag_id)
+         VALUES ($1, $2)
+         ON CONFLICT (user_id, tag_id) DO NOTHING`,
+        [userId, tagId]
+    );
+};
+
+// Unfollow a tag
+const unfollowTag = async (userId, tagId) => {
+    await pool.query(
+        `DELETE FROM user_tag_follow WHERE user_id = $1 AND tag_id = $2`,
+        [userId, tagId]
+    );
+};
+
 export default {
     getAllTags,
-    getDetailedTags
+    getDetailedTags,
+    getFollowedTags,
+    getFollowedTagIds,
+    followTag,
+    unfollowTag
 };

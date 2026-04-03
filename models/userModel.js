@@ -223,9 +223,9 @@ const getUserReputationHistory = async (userId, limit, offset) => {
         history_id as "historyId",
         change_amount as "changeAmount",
         reason,
-        related_entity_type as "relateEntityType",
-        related_entity_id as "relateEntityId",
-        created_at as "createAt"
+        related_entity_type as "relatedEntityType",
+        related_entity_id as "relatedEntityId",
+        created_at as "createdAt"
     FROM reputation_history
     WHERE user_id = $1
     ORDER BY created_at DESC

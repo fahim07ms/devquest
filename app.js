@@ -30,6 +30,7 @@ import bountyRoutes from "./routes/bountyRoutes.js";
 import { getFlagsByContentId } from './controllers/flagController.js';
 import authMiddleware, { moderatorMiddleware }from "./middleware/authMiddleware.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
+import dashboardRoutes from "./routes/dashboardRoutes.js";
 
 
 // API Routes
@@ -42,6 +43,7 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/votes', voteRoutes);
 app.use('/api/flags', flagRoutes);
 app.use('/api/bookmarks', bookmarkRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 app.use('/api/questions/:questionId/bounties', bountyRoutes);
 app.use('/api/bounties', bountyRoutes);
