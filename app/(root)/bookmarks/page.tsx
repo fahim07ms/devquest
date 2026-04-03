@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import type { Question } from '@/types'
 import { QuestionCard } from '@/components/questions/QuestionCard'
 import { cn } from '@/lib/utils'
-import { BookmarkSimple } from '@phosphor-icons/react'
+import { BookmarkSimpleIcon } from '@phosphor-icons/react'
 import { useAuthStore } from '@/store/authStore'
 import api from '@/lib/api'
 import { CustomPagination } from "@/components/questions/Pagination";
@@ -29,8 +29,7 @@ export default function BookmarksPage() {
 
     // Redirect or fetch logic
     useEffect(() => {
-        // If not authenticated (and we've mounted so we are sure), 
-        // we can't fetch bookmarks. The user should log in.
+        // If not authenticated, we can't fetch bookmarks. The user should log in.
         if (mounted && !isAuthenticated) {
             router.push('/login?redirect=/bookmarks');
             return;
@@ -78,7 +77,7 @@ export default function BookmarksPage() {
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
                 <div>
                     <div className="flex items-center gap-2.5 mb-2">
-                        <BookmarkSimple className="h-6 w-6 text-primary" weight="fill" />
+                        <BookmarkSimpleIcon className="h-6 w-6 text-primary" weight="fill" />
                         <h1 className="text-2xl font-bold text-foreground" style={{ letterSpacing: '-0.03em' }}>
                             Saved Bookmarks
                         </h1>
@@ -118,10 +117,10 @@ export default function BookmarksPage() {
                     ))
                 ) : questions.length === 0 ? (
                     <div className="text-center py-20 border border-dashed border-border/60 bg-muted/10">
-                        <BookmarkSimple className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" weight="duotone" />
+                        <BookmarkSimpleIcon className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" weight="duotone" />
                         <p className="text-base font-semibold text-foreground mb-1.5">No bookmarks found</p>
                         <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-4">
-                            You haven't saved any questions yet. Find interesting questions and click the save button to revisit them later.
+                            You haven&#39;t saved any questions yet. Find interesting questions and click the save button to revisit them later.
                         </p>
                     </div>
                 ) : (

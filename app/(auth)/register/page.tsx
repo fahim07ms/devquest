@@ -8,7 +8,7 @@ import {RegisterInput, registerSchema} from "@/lib/validation";
 import {zodResolver} from "@hookform/resolvers/zod";
 import api from "@/lib/api";
 import {toast} from "sonner";
-import {Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle} from "@/components/ui/card";
+import {Card, CardContent, CardFooter, CardHeader, CardTitle} from "@/components/ui/card";
 import {Field, FieldError, FieldGroup, FieldLabel} from "@/components/ui/field";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";

@@ -1,17 +1,16 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { formatDistanceToNow, format } from 'date-fns'
 import { useAuthStore } from '@/store/authStore'
 import { TagBadge } from '@/components/ui/TagBadge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
-import type { Badge, BadgeTier, ReputationHistory, ReputationReason, Tag } from '@/types'
+import type { Badge, BadgeTier, ReputationHistory, Tag } from '@/types'
 import {
     PencilSimpleIcon,
     LinkSimpleIcon,
@@ -21,17 +20,15 @@ import {
     ChatDotsIcon,
     ArrowUpIcon,
     CheckCircleIcon,
-    CameraIcon,
-    XIcon,
     ArrowLeftIcon,
-    ArrowUpRightIcon,
-    ArrowDownRightIcon,
-    ClockIcon,
 } from '@phosphor-icons/react'
+import {UserProfilePageSkeleton} from "@/components/skeleton/UserProfilePageSkeleton";
+import {ProfileAvatar} from "@/components/users/ProfileAvatar";
+import {EditDrawer} from "@/components/users/EditDrawer";
+import {ReputationRow} from "@/components/users/ReputationRow";
+import {BadgeCard} from "@/components/users/BadgeCard";
 
-// ── Interfaces ────────────────────────────────────────────────────────────────
-
-interface UserProfile {
+export interface UserProfile {
     id: string
     username: string
     role: string
@@ -44,6 +41,7 @@ interface UserProfile {
     website?: string
     profilePicture?: string
 }
+
 
 interface UserQuestion {
     id: string
@@ -67,25 +65,8 @@ interface UserAnswer {
 
 type ActiveTab = 'questions' | 'answers' | 'badges' | 'reputation'
 
-// ── Reputation label helpers ──────────────────────────────────────────────────
 
-const REPUTATION_LABELS: Record<ReputationReason, string> = {
-    QUESTION_UPVOTED:     'Question upvoted',
-    QUESTION_DOWNVOTED:   'Question downvoted',
-    ANSWER_UPVOTED:       'Answer upvoted',
-    ANSWER_DOWNVOTED:     'Answer downvoted',
-    ANSWER_ACCEPTED:      'Answer accepted',
-    ANSWER_UNACCEPTED:    'Answer acceptance removed',
-    BOUNTY_OFFERED:       'Bounty offered',
-    BOUNTY_AWARDED:       'Bounty awarded to you',
-    DOWNVOTE_GIVEN:       'Downvote cast',
-    SPAM_PENALTY:         'Spam penalty',
-    MODERATOR_ADJUSTMENT: 'Moderator adjustment',
-}
-
-// ── Badge tier styles ─────────────────────────────────────────────────────────
-
-const TIER_STYLES: Record<BadgeTier, { ring: string; bg: string; label: string; dot: string }> = {
+export const TIER_STYLES: Record<BadgeTier, { ring: string; bg: string; label: string; dot: string }> = {
     gold:   { ring: 'border-amber-400/60',   bg: 'bg-amber-400/10',   label: 'text-amber-600 dark:text-amber-400',   dot: 'bg-amber-400' },
     silver: { ring: 'border-slate-400/60',   bg: 'bg-slate-400/10',   label: 'text-slate-600 dark:text-slate-300',   dot: 'bg-slate-400' },
     bronze: { ring: 'border-orange-700/60',  bg: 'bg-orange-700/10',  label: 'text-orange-700 dark:text-orange-400', dot: 'bg-orange-700' },
@@ -103,252 +84,6 @@ function StatPill({ icon: Icon, label, value }: { icon: React.ElementType; label
     )
 }
 
-function ProfileAvatar({ src, initials, size = 'lg' }: { src?: string; initials: string; size?: 'lg' | 'sm' }) {
-    const dim  = size === 'lg' ? 'h-20 w-20' : 'h-12 w-12'
-    const text = size === 'lg' ? 'text-2xl' : 'text-base'
-    return (
-        <div className={cn(dim, 'flex-shrink-0 bg-primary/10 border-2 border-primary/20 overflow-hidden', text, 'flex items-center justify-center font-bold text-primary')}>
-            {src ? <img src={src} alt="avatar" className="h-full w-full object-cover" /> : <span>{initials}</span>}
-        </div>
-    )
-}
-
-// ── Badge card ────────────────────────────────────────────────────────────────
-
-function BadgeCard({ badge }: { badge: Badge }) {
-    const s = TIER_STYLES[badge.tier]
-    return (
-        <div className={cn('flex items-start gap-3 p-4 border', s.ring, s.bg)}>
-            <div className={cn('flex-shrink-0 mt-0.5 h-2 w-2', s.dot)} />
-            <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-2 flex-wrap">
-                    <span className="text-sm font-semibold text-foreground" style={{ letterSpacing: '-0.01em' }}>
-                        {badge.name}
-                    </span>
-                    <span className={cn('text-[10px] font-bold uppercase tracking-wider', s.label)}>
-                        {badge.tier}
-                    </span>
-                </div>
-                <p className="text-xs text-muted-foreground/70 mt-0.5 leading-snug">
-                    {badge.description}
-                </p>
-                <p className="text-[10px] text-muted-foreground/40 mt-1.5 flex items-center gap-1">
-                    <ClockIcon className="h-3 w-3" />
-                    Earned {formatDistanceToNow(new Date(badge.awardedAt), { addSuffix: true })}
-                </p>
-            </div>
-        </div>
-    )
-}
-
-// ── Reputation row ────────────────────────────────────────────────────────────
-
-function ReputationRow({ entry }: { entry: ReputationHistory }) {
-    const positive = entry.changeAmount > 0
-    return (
-        <div className="flex items-center gap-3 py-3 border-b border-border/30 last:border-0">
-            {/* Change amount */}
-            <div className={cn(
-                'flex-shrink-0 flex items-center gap-0.5 w-14 justify-end font-bold tabular-nums text-sm',
-                positive ? 'text-emerald-500' : 'text-destructive'
-            )}>
-                {positive
-                    ? <ArrowUpRightIcon className="h-3.5 w-3.5" weight="bold" />
-                    : <ArrowDownRightIcon className="h-3.5 w-3.5" weight="bold" />
-                }
-                {positive ? '+' : ''}{entry.changeAmount}
-            </div>
-
-            {/* Label */}
-            <div className="flex-1 min-w-0">
-                <p className="text-xs text-foreground/80">
-                    {REPUTATION_LABELS[entry.reason] ?? entry.reason}
-                </p>
-            </div>
-
-            {/* Time */}
-            <p className="text-[10px] text-muted-foreground/40 flex-shrink-0">
-                {formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true })}
-            </p>
-        </div>
-    )
-}
-
-// ── Edit drawer ───────────────────────────────────────────────────────────────
-
-function EditDrawer({
-                        open, profile, onClose, onSaved,
-                    }: {
-    open: boolean
-    profile: UserProfile
-    onClose: () => void
-    onSaved: (updated: Partial<UserProfile>) => void
-}) {
-    const fileInputRef = useRef<HTMLInputElement>(null)
-    const [firstName, setFirstName]           = useState(profile.firstName ?? '')
-    const [lastName, setLastName]             = useState(profile.lastName  ?? '')
-    const [bio, setBio]                       = useState(profile.bio       ?? '')
-    const [website, setWebsite]               = useState(profile.website   ?? '')
-    const [birthDate, setBirthDate]           = useState('')
-    const [isSaving, setIsSaving]             = useState(false)
-    const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
-    const [avatarPreview, setAvatarPreview]   = useState<string | undefined>(profile.profilePicture)
-
-    const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (!file) return
-
-        if (!file.type.startsWith('image/')) { toast.error('Please select an image file.'); return }
-        if (file.size > 5 * 1024 * 1024)     { toast.error('Image size should be less than 5MB.'); return }
-
-        const reader = new FileReader()
-        reader.onload = () => setAvatarPreview(reader.result as string)
-        reader.readAsDataURL(file)
-
-        setIsUploadingAvatar(true)
-        try {
-            const fd = new FormData()
-            fd.append('avatar', file)
-            const res = await api.put('/users/me/avatar', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-            const newPic = res.data?.data?.user?.profilePicture
-            if (newPic) {
-                setAvatarPreview(newPic)
-                onSaved({ profilePicture: newPic })
-                toast.success('Avatar updated.')
-            }
-        } catch {
-            toast.error('Failed to upload avatar.')
-        } finally {
-            setIsUploadingAvatar(false)
-            e.target.value = ''
-        }
-    }
-
-    const handleSave = async () => {
-        setIsSaving(true)
-        try {
-            await api.put('/users/me', {
-                firstName: firstName.trim() || null,
-                lastName:  lastName.trim()  || null,
-                bio:       bio.trim()       || null,
-                website:   website.trim()   || null,
-                birthDate: birthDate        || null,
-            })
-            onSaved({ firstName, lastName, bio, website })
-            onClose()
-            toast.success('Profile updated.')
-        } catch {
-            toast.error('Failed to save profile.')
-        } finally {
-            setIsSaving(false)
-        }
-    }
-
-    const initials = [profile.firstName, profile.lastName]
-            .filter(Boolean).map((n) => n![0].toUpperCase()).join('') ||
-        profile.username.slice(0, 2).toUpperCase()
-
-    return (
-        <>
-            <div
-                className={cn('fixed inset-0 z-40 bg-black/30 backdrop-blur-sm transition-opacity duration-300', open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none')}
-                onClick={onClose}
-            />
-            <div className={cn('fixed top-0 right-0 bottom-0 z-50 w-full max-w-sm bg-background border-l border-border/60', 'flex flex-col transition-transform duration-300 ease-out', open ? 'translate-x-0' : 'translate-x-full')}>
-                {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
-                    <div>
-                        <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-primary/70">Your profile</p>
-                        <h2 className="text-base font-bold text-foreground" style={{ letterSpacing: '-0.02em' }}>Edit details</h2>
-                    </div>
-                    <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors p-1.5">
-                        <XIcon className="h-4 w-4" />
-                    </button>
-                </div>
-
-                {/* Body */}
-                <div className="flex-1 overflow-y-auto px-5 py-6 space-y-6">
-                    {/* Avatar */}
-                    <div>
-                        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-3">Profile picture</p>
-                        <div className="flex items-center gap-4">
-                            <div className="relative flex-shrink-0">
-                                <ProfileAvatar src={avatarPreview} initials={initials} size="lg" />
-                                {isUploadingAvatar && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-background/70">
-                                        <div className="h-4 w-4 border-2 border-primary border-t-transparent animate-spin" />
-                                    </div>
-                                )}
-                            </div>
-                            <div>
-                                <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleAvatarChange} />
-                                <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploadingAvatar} className="h-8 text-xs gap-1.5 shadow-none">
-                                    <CameraIcon className="h-3.5 w-3.5" />
-                                    Change photo
-                                </Button>
-                                <p className="text-[11px] text-muted-foreground/50 mt-1.5">PNG, JPG or WebP · max 5 MB</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="h-px bg-border/40" />
-
-                    {/* Name */}
-                    <div>
-                        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-3">Name</p>
-                        <div className="flex gap-2">
-                            <div className="flex-1">
-                                <label className="text-xs text-muted-foreground mb-1 block">First</label>
-                                <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" className="h-8 text-sm rounded-none shadow-none border-border/60" />
-                            </div>
-                            <div className="flex-1">
-                                <label className="text-xs text-muted-foreground mb-1 block">Last</label>
-                                <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" className="h-8 text-sm rounded-none shadow-none border-border/60" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Bio */}
-                    <div>
-                        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-3">Bio</p>
-                        <textarea
-                            value={bio} onChange={(e) => setBio(e.target.value)}
-                            placeholder="A short description about yourself…"
-                            rows={4} maxLength={300}
-                            className={cn('w-full text-sm bg-background border border-border/60 px-3 py-2', 'resize-none outline-none transition-colors duration-150', 'focus:border-primary/50 focus:ring-2 focus:ring-primary/10', 'placeholder:text-muted-foreground/40')}
-                        />
-                        <p className="text-[11px] text-muted-foreground/40 text-right mt-1">{bio.length}/300</p>
-                    </div>
-
-                    {/* Website */}
-                    <div>
-                        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-3">Website</p>
-                        <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://yoursite.com" type="url" className="h-8 text-sm rounded-none shadow-none border-border/60" />
-                    </div>
-
-                    {/* Birth date */}
-                    <div>
-                        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-muted-foreground/60 mb-3">Date of birth</p>
-                        <Input value={birthDate} onChange={(e) => setBirthDate(e.target.value)} type="date" className="h-8 text-sm rounded-none shadow-none border-border/60" />
-                    </div>
-                </div>
-
-                {/* Footer */}
-                <div className="px-5 py-4 border-t border-border/50 flex items-center justify-end gap-3">
-                    <Button type="button" variant="ghost" size="sm" onClick={onClose} className="h-8 px-5 text-xs text-muted-foreground">
-                        Cancel
-                    </Button>
-                    <Button type="button" size="sm" onClick={handleSave} disabled={isSaving} className="h-8 px-5 text-xs shadow-none">
-                        {isSaving ? 'Saving…' : 'Save changes'}
-                    </Button>
-                </div>
-            </div>
-        </>
-    )
-}
-
-// ── Page ──────────────────────────────────────────────────────────────────────
-
 export default function UserProfilePage() {
     const params   = useParams()
     const username  = params.username as string
@@ -364,7 +99,7 @@ export default function UserProfilePage() {
     const [mounted,     setMounted]     = useState(false)
     const [editOpen,    setEditOpen]    = useState(false)
 
-    // Track if auxiliary tabs have been fetched yet (lazy load)
+    // Track if auxiliary tabs haven't been fetched yet (lazy load)
     const [badgesFetched,     setBadgesFetched]     = useState(false)
     const [reputationFetched, setReputationFetched] = useState(false)
 
@@ -395,7 +130,7 @@ export default function UserProfilePage() {
         fetchCore()
     }, [username])
 
-    // Lazy-fetch badges when tab is activated
+    // Lazy-fetch badges when the tab is activated
     useEffect(() => {
         if (activeTab !== 'badges' || badgesFetched || !profile) return
         const fetchBadges = async () => {
@@ -410,7 +145,7 @@ export default function UserProfilePage() {
         fetchBadges()
     }, [activeTab, badgesFetched, profile, username])
 
-    // Lazy-fetch reputation history when tab is activated (own profile only)
+    // Lazy-fetch reputation history when the tab is activated (own profile only)
     useEffect(() => {
         if (activeTab !== 'reputation' || reputationFetched || !isOwnProfile) return
         const fetchReputation = async () => {
@@ -450,23 +185,8 @@ export default function UserProfilePage() {
         ...(isOwnProfile ? [{ key: 'reputation' as ActiveTab, label: 'Reputation' }] : []),
     ]
 
-    // ── Loading skeleton ──────────────────────────────────────────────────────
-
     if (isLoading) {
-        return (
-            <div className="max-w-3xl mx-auto w-full px-5 py-8 animate-pulse">
-                <div className="flex gap-5 mb-8">
-                    <div className="h-20 w-20 bg-muted flex-shrink-0" />
-                    <div className="flex-1 space-y-2 pt-2">
-                        <div className="h-5 w-40 bg-muted" />
-                        <div className="h-3 w-24 bg-muted" />
-                        <div className="h-3 w-56 bg-muted" />
-                    </div>
-                </div>
-                <div className="h-px bg-muted mb-6" />
-                {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-14 bg-muted mb-3" />)}
-            </div>
-        )
+        return <UserProfilePageSkeleton />;
     }
 
     if (!profile) {

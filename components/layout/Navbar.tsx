@@ -7,14 +7,12 @@ import { useAuthStore } from '@/store/authStore'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { MagnifyingGlassIcon, MoonIcon, SunIcon, PencilSimpleIcon } from '@phosphor-icons/react'
-import { useTheme } from 'next-themes'
+import { MagnifyingGlassIcon, PencilSimpleIcon } from '@phosphor-icons/react'
 import { NotificationDropdown } from '@/components/notifications/NotificationDropdown'
 
 export function Navbar() {
     const router = useRouter()
     const { isAuthenticated } = useAuthStore()
-    const { theme, setTheme } = useTheme()
     const searchParams = useSearchParams()
     const [search, setSearch] = useState(searchParams.get('search') || '')
     const [focused, setFocused] = useState(false)
@@ -83,18 +81,6 @@ export function Navbar() {
                 {/* Notification bell — authenticated users only */}
                 {isAuthenticated && <NotificationDropdown />}
 
-                {/* Theme toggle */}
-                <button
-                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                    className="h-8 w-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-150"
-                    title="Toggle theme"
-                >
-                    {theme === 'dark' ? (
-                        <SunIcon className="h-3.5 w-3.5" />
-                    ) : (
-                        <MoonIcon className="h-3.5 w-3.5" />
-                    )}
-                </button>
             </div>
         </header>
     )

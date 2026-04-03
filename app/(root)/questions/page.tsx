@@ -61,7 +61,7 @@ export default function QuestionsPage() {
 
     useEffect(() => { setMounted(true) }, [])
 
-    // Close filter panel on outside click
+    // Close the filter panel on the outside click
     useEffect(() => {
         const handler = (e: MouseEvent) => {
             if (filterRef.current && !filterRef.current.contains(e.target as Node))

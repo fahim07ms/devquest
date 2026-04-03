@@ -3,7 +3,6 @@
 import { useAuthStore } from '@/store/authStore'
 import { useEffect, useState } from 'react'
 import api from '@/lib/api'
-import { useRouter } from 'next/navigation'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { Navbar } from '@/components/layout/Navbar'
@@ -11,9 +10,8 @@ import { Navbar } from '@/components/layout/Navbar'
 export default function RootLayout({ children }: { children: React.ReactNode }) {
     const { login, logout } = useAuthStore()
     const [isLoading, setIsLoading] = useState<boolean>(true)
-    const router = useRouter()
 
-    // Verify session with backend on mount
+    // Verify the session with the backend on mount
     useEffect(() => {
         const verifyAuth = async () => {
             setIsLoading(true)
@@ -24,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 }
             } catch (error) {
                 console.log('Authentication failed:', error);
-                // If verification fails, logout and redirect to login
+                // If verification fails, logout
                 logout();
             } finally {
                 setIsLoading(false);
