@@ -12,6 +12,7 @@ const sortOptions = {
 export const getQuestions = async (req, res) => {
     let { page, limit, sort, order, search, answered, hasBounty } = req.query;
     
+    // Default values if page and limit not provided
     if (isNaN(page) || page <= 0) page = 1;
     if (isNaN(limit) || limit <= 0) limit = 10;
     
@@ -22,10 +23,11 @@ export const getQuestions = async (req, res) => {
     const searchValue = search || '';
     const tags        = req.query.tags ? req.query.tags.split(',').filter(Boolean) : [];
     
-    // Moderators and admins see frozen content in listings
+    // Moderators and admins can see frozen content in listings
     const bypassFreeze = req.role === 'admin' || req.role === 'moderator';
     
     try {
+        // Get questions
         const { questions, totalQuestions, currentPage, totalPages } =
             await QuestionModel.getQuestions(
                 limitValue,
@@ -34,8 +36,8 @@ export const getQuestions = async (req, res) => {
                 orderValue,
                 tags,
                 searchValue,
-                answered,   // passed as raw string 'true'/'false'/undefined — model handles the cast
-                hasBounty,  // passed as raw string 'true'/'false'/undefined
+                answered,
+                hasBounty,
                 bypassFreeze
             );
         
@@ -104,6 +106,7 @@ export const editQuestion = async (req, res) => {
             return sendErrorResponse(res, 404, 'Question not found.');
         }
         
+        // Verify that the user is the author
         if (question.author.authorId !== userId) {
             return sendErrorResponse(res, 403, 'You are not authorized to edit this question.');
         }
@@ -150,7 +153,7 @@ export const deleteQuestion = async (req, res) => {
     }
 };
 
-// Increment question view count (fire-and-forget)
+// Increment question view count
 export const updateQuestionViewCount = async (req, res) => {
     const { questionId } = req.params;
     

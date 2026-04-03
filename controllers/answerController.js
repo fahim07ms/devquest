@@ -8,6 +8,7 @@ export const getAnswersByQuestionId = async (req, res) => {
     const bypassFreeze = req.role === 'admin' || req.role === 'moderator';
     
     try {
+        // Check if the question exists
         const question = await QuestionModel.getQuestionById(questionId, bypassFreeze);
         
         if (!question) {
@@ -18,6 +19,7 @@ export const getAnswersByQuestionId = async (req, res) => {
             );
         }
         
+        // Fetch answers for the question
         const answers = await AnswerModel.getAnswersByQuestionId(questionId, bypassFreeze);
         
         return res.status(200).json({
@@ -69,6 +71,7 @@ export const createAnswer = async (req, res) => {
     const { body } = req.body;
     
     try {
+        // Check if the question exists
         const question = await QuestionModel.getQuestionById(questionId);
         
         if (!question) {
@@ -79,6 +82,7 @@ export const createAnswer = async (req, res) => {
             );
         }
         
+        // Create the answer
         const answer = await AnswerModel.createAnswer(req.userId, questionId, body);
         
         if (!answer) {
@@ -110,16 +114,19 @@ export const editAnswer = async (req, res) => {
     const userId = req.userId;
     
     try {
+        // Check if the answer exists
         const answer = await AnswerModel.getAnswerById(answerId);
         
         if (!answer) {
             return sendErrorResponse(res, 404, 'Answer not found.');
         }
         
+        // Check if the user is the author of the answer
         if (answer.author.authorId !== userId) {
             return sendErrorResponse(res, 403, 'You are not authorized to edit this answer.');
         }
         
+        // Update the answer
         const updatedAnswer = await AnswerModel.updateAnswer(answerId, body, userId);
         
         if (!updatedAnswer) {
@@ -153,24 +160,19 @@ export const deleteAnswer = async (req, res) => {
     const userId = req.userId;
     
     try {
+        // Check if the answer exists
         const answer = await AnswerModel.getAnswerById(answerId);
         
         if (!answer) {
-            return sendErrorResponse(
-                res,
-                404,
-                'Answer not found.'
-            );
+            return sendErrorResponse(res, 404, 'Answer not found.');
         }
         
+        // Only allow the author to delete the answer
         if (answer.author.authorId !== userId) {
-            return sendErrorResponse(
-                res,
-                403,
-                'You are not authorized to delete this answer.'
-            );
+            return sendErrorResponse(res, 403, 'You are not authorized to delete this answer.');
         }
         
+        // Delete the answer
         const deleted = await AnswerModel.deleteAnswer(answerId, userId);
         
         if (!deleted) {
@@ -188,26 +190,14 @@ export const deleteAnswer = async (req, res) => {
         if (process.env.NODE_ENV === 'development') console.log(error);
         
         if (error.message === 'NOT_FOUND') {
-            return sendErrorResponse(
-                res,
-                404,
-                'Answer not found.'
-            );
+            return sendErrorResponse(res, 404, 'Answer not found.');
         }
         
         if (error.message === 'UNAUTHORIZED') {
-            return sendErrorResponse(
-                res,
-                403,
-                'You are not authorized to delete this answer.'
-            );
+            return sendErrorResponse(res, 403, 'You are not authorized to delete this answer.');
         }
         
-        return sendErrorResponse(
-            res,
-            500,
-            'Internal Server Error'
-        );
+        return sendErrorResponse(res, 500, 'Internal Server Error');
     }
 };
 
@@ -217,11 +207,13 @@ export const editAnswerAcceptanceStatus = async (req, res) => {
     const userId = req.userId;
     const { accepted } = req.body;
     
+    // Validate accepted value
     if (accepted !== true && accepted !== false) {
         return sendErrorResponse(res, 400, 'Invalid accepted value. Must be true or false.');
     }
     
     try {
+        // Check if the answer exists
         const answer = await AnswerModel.getAnswerById(answerId);
         if (!answer) return sendErrorResponse(res, 404, 'Answer not found.');
         
@@ -233,6 +225,7 @@ export const editAnswerAcceptanceStatus = async (req, res) => {
             return sendErrorResponse(res, 403, 'Only the question author can accept or unaccept answers.');
         }
         
+        // Update the answer acceptance status
         const acceptedAt = accepted ? new Date() : null;
         const updatedAnswer = await AnswerModel.updateAnswerStatus(answerId, accepted, acceptedAt);
         if (!updatedAnswer) return sendErrorResponse(res, 424, 'Failed to update answer acceptance status.');

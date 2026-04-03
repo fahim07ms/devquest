@@ -1,8 +1,8 @@
 import {withTransaction} from "../db/client.js";
 import pool from "../db/pool.js";
 
+// Get a user by his user id
 const getUserById = async (id) => {
-    
     const query = `
         SELECT
             u.user_id as id,
@@ -32,6 +32,7 @@ const getUserById = async (id) => {
     return result.rows[0] || null;
 }
 
+// Get a user by his username(public data)
 const getUserByUsername = async (username) => {
     const query = `
         SELECT
@@ -61,6 +62,7 @@ const getUserByUsername = async (username) => {
     return result.rows[0] || null;
 }
 
+// Update user profile data
 const updateUserProfileData = async (userId, { firstName, lastName, birthDate, bio, website }) => {
     const query = `
         UPDATE profile p
@@ -91,6 +93,7 @@ const updateUserProfileData = async (userId, { firstName, lastName, birthDate, b
     return result || null;
 }
 
+// Update user profile picture
 const updateUserProfilePicture = async (userId, profilePicture) => {
     const query = `
         UPDATE profile p
@@ -121,6 +124,7 @@ const updateUserProfilePicture = async (userId, profilePicture) => {
     return result || null;
 }
 
+// Get user-asked questions
 const getQuestionsByUsername = async (username) => {
     const query = `
         SELECT
@@ -138,7 +142,7 @@ const getQuestionsByUsername = async (username) => {
                 FROM question_tag qt
                 JOIN tag t ON qt.tag_id = t.tag_id
                 WHERE qt.question_id = q.content_id
-            ) AS tags
+            ) as tags
         FROM question q
             JOIN content c ON c.content_id = q.content_id
             JOIN "user" u ON u.user_id = c.author_id
@@ -155,6 +159,7 @@ const getQuestionsByUsername = async (username) => {
     }
 }
 
+// Get user-answered answers
 const getAnswersByUsername = async (username) => {
     const query = `
         SELECT
@@ -182,11 +187,81 @@ const getAnswersByUsername = async (username) => {
     }
 }
 
+// Get user badges
+const getUserBadges = async (username) => {
+    const query = `
+        SELECT
+            ba.award_id as "badgeId",
+            b.name,
+            b.description,
+            b.badge_tier as "tier",
+            b.criteria_type as "criteriaType",
+            b.criteria_threshold as "criteriaThreshold",
+            b.icon_url as "iconUrl",
+            ba.awarded_at as "awardedAt"
+        FROM badge_award ba
+        JOIN badge b ON ba.badge_id = b.badge_id
+        JOIN "user" U ON ba.user_id  = u.user_id
+        WHERE u.username = $1
+        ORDER BY ba.awarded_at DESC
+    `;
+    
+    try {
+        const result = await pool.query(query, [username]);
+        
+        return result.rows;
+    } catch (error) {
+        console.error('Error fetching user badges:', error);
+        throw error;
+    }
+}
+
+// Get user reputation history
+const getUserReputationHistory = async (userId, limit, offset) => {
+    const query = `
+    SELECT
+        history_id as "historyId",
+        change_amount as "changeAmount",
+        reason,
+        related_entity_type as "relateEntityType",
+        related_entity_id as "relateEntityId",
+        created_at as "createAt"
+    FROM reputation_history
+    WHERE user_id = $1
+    ORDER BY created_at DESC
+    LIMIT $2 OFFSET $3
+    `;
+    
+    try {
+        const result = await pool.query(query, [userId, limit, offset]);
+        
+        const countRes = await pool.query(
+            `SELECT COUNT(*) FROM reputation_history WHERE user_id = $1`,
+            [userId]
+        );
+        
+        const total = parseInt(countRes.rows[0].count, 10);
+        
+        const hasMore = offset + limit < total;
+        
+        return {
+            history: result.rows,
+            total,
+            hasMore
+        };
+    } catch (error) {
+        console.error('Error fetching reputation history:', error);
+        throw error;
+    }
+}
+
 export default {
     getUserById,
     getUserByUsername,
     updateUserProfileData,
     getQuestionsByUsername,
     getAnswersByUsername,
-    updateUserProfilePicture
+    updateUserProfilePicture,
+    getUserBadges,
+    getUserReputationHistory,
 };

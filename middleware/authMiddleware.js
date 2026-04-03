@@ -6,6 +6,8 @@ dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
+// AuthMiddleware verifies the JWT token and populates req.userId and req.role.
+// If token is missing, then return 401 Unauthorized.
 export default function authMiddleware(req, res, next) {
     try {
         const token = req.cookies.accessToken;
@@ -33,6 +35,7 @@ export default function authMiddleware(req, res, next) {
     }
 }
 
+// Check user role if it is moderator/admin or not
 export const moderatorMiddleware = (req, res, next) => {
     if (!req.role || !['moderator', 'admin'].includes(req.role)) {
         return sendErrorResponse(
@@ -44,8 +47,7 @@ export const moderatorMiddleware = (req, res, next) => {
     next();
 };
 
-// optionalAuthMiddleware attempts to decode the token to populate
-// req.userId and req.role, but does NOT return 401 if it's missing or invalid.
+// Decode the JWT token to get userId and role silently without sending 401 error when failed.
 export function optionalAuthMiddleware(req, res, next) {
     try {
         const token = req.cookies.accessToken;

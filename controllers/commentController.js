@@ -32,7 +32,7 @@ export const getCommentsByParentId = async (req, res) => {
     }
 };
 
-// Get single comment by ID
+// Get a single comment by ID
 export const getCommentById = async (req, res) => {
     const { commentId } = req.params;
     const bypassFreeze = req.role === 'admin' || req.role === 'moderator';
@@ -90,6 +90,7 @@ export const createComment = async (req, res) => {
     const { body, recipientId } = req.body;
     
     try {
+        // Validate that the parent exists
         let parent = null;
         if (parentType === 'answer') { parent = await AnswerModel.getAnswerById(parentId); }
         if (parentType === 'question') { parent = await QuestionModel.getQuestionById(parentId); }
@@ -147,6 +148,7 @@ export const editComment = async (req, res) => {
             )
         }
         
+        // Check if the user is the author of the comment
         if (comment.author.authorId !== userId) {
             return sendErrorResponse(
                 res,

@@ -1,6 +1,7 @@
 import notificationModel from '../models/notificationModel.js';
 import { sendErrorResponse } from '../utils/error.js';
 
+// Get notifications for a user
 export const getNotifications = async (req, res) => {
     try {
         const userId = req.userId;
@@ -20,6 +21,7 @@ export const getNotifications = async (req, res) => {
     }
 };
 
+// Mark a notification as read
 export const markAsRead = async (req, res) => {
     try {
         const { id } = req.params;
@@ -38,6 +40,7 @@ export const markAsRead = async (req, res) => {
     }
 };
 
+// Mark all notifications as read
 export const markAllAsRead = async (req, res) => {
     try {
         const userId = req.userId;

@@ -15,11 +15,7 @@ export const createFlag = async (req, res) => {
         });
         
         if (!flag) {
-            return sendErrorResponse(
-                res,
-                424,
-                'Failed to create flag.'
-            );
+            return sendErrorResponse(res, 424, 'Failed to create flag.');
         }
         
         return res.status(201).json({
@@ -32,18 +28,10 @@ export const createFlag = async (req, res) => {
         if (process.env.NODE_ENV === 'development') console.log(error);
         
         if (error.message === 'ALREADY_FLAGGED') {
-            return sendErrorResponse(
-                res,
-                409,
-                'You have already flagged this content.'
-            );
+            return sendErrorResponse(res, 409, 'You have already flagged this content.');
         }
         
-        return sendErrorResponse(
-            res,
-            500,
-            'Internal Server Error'
-        );
+        return sendErrorResponse(res, 500, 'Internal Server Error');
     }
 };
 
@@ -80,11 +68,7 @@ export const getAllFlags = async (req, res) => {
     } catch (error) {
         if (process.env.NODE_ENV === 'development') console.log(error);
         
-        return sendErrorResponse(
-            res,
-            500,
-            'Internal Server Error'
-        );
+        return sendErrorResponse(res, 500, 'Internal Server Error');
     }
 };
 
@@ -96,11 +80,7 @@ export const getFlagById = async (req, res) => {
         const flag = await FlagModel.getFlagById(flagId);
         
         if (!flag) {
-            return sendErrorResponse(
-                res,
-                404,
-                'Flag not found.'
-            );
+            return sendErrorResponse(res, 404, 'Flag not found.');
         }
         
         return res.status(200).json({
@@ -112,11 +92,7 @@ export const getFlagById = async (req, res) => {
     } catch (error) {
         if (process.env.NODE_ENV === 'development') console.log(error);
         
-        return sendErrorResponse(
-            res,
-            500,
-            'Internal Server Error'
-        );
+        return sendErrorResponse(res, 500, 'Internal Server Error');
     }
 };
 
@@ -136,44 +112,33 @@ export const getFlagsByContentId = async (req, res) => {
     } catch (error) {
         if (process.env.NODE_ENV === 'development') console.log(error);
         
-        return sendErrorResponse(
-            res,
-            500,
-            'Internal Server Error'
-        );
+        return sendErrorResponse(res, 500, 'Internal Server Error');
     }
 };
 
 // Moderator/admin only — update flag status and optionally add a note.
 // Changing from 'action_taken' to another status will automatically unfreeze
-// the associated content (handled inside flagModel.reviewFlag).
 export const reviewFlag = async (req, res) => {
     const { flagId }   = req.params;
     const moderatorId  = req.userId;
     const { status, moderatorNote } = req.body;
     
     try {
+        // Check if the flag exists
         const flag = await FlagModel.getFlagById(flagId);
         
         if (!flag) {
-            return sendErrorResponse(
-                res,
-                404,
-                'Flag not found.'
-            );
+            return sendErrorResponse(res, 404, 'Flag not found.');
         }
         
+        // Update the flag status and optionally add a moderator note
         const updatedFlag = await FlagModel.reviewFlag(flagId, moderatorId, {
             status,
             moderatorNote,
         });
         
         if (!updatedFlag) {
-            return sendErrorResponse(
-                res,
-                424,
-                'Failed to update flag.'
-            );
+            return sendErrorResponse(res, 424, 'Failed to update flag.');
         }
         
         return res.status(200).json({
@@ -186,18 +151,10 @@ export const reviewFlag = async (req, res) => {
         if (process.env.NODE_ENV === 'development') console.log(error);
         
         if (error.message === 'NOT_FOUND') {
-            return sendErrorResponse(
-                res,
-                404,
-                'Flag not found.'
-            );
+            return sendErrorResponse(res, 404, 'Flag not found.');
         }
         
-        return sendErrorResponse(
-            res,
-            500,
-            'Internal Server Error'
-        );
+        return sendErrorResponse(res, 500, 'Internal Server Error');
     }
 };
 
@@ -209,21 +166,13 @@ export const deleteFlag = async (req, res) => {
         const flag = await FlagModel.getFlagById(flagId);
         
         if (!flag) {
-            return sendErrorResponse(
-                res,
-                404,
-                'Flag not found.'
-            );
+            return sendErrorResponse(res, 404, 'Flag not found.');
         }
         
         const deleted = await FlagModel.deleteFlag(flagId);
         
         if (!deleted) {
-            return sendErrorResponse(
-                res,
-                424,
-                'Failed to delete flag.'
-            );
+            return sendErrorResponse(res, 424, 'Failed to delete flag.');
         }
         
         return res.status(200).json({
@@ -233,18 +182,10 @@ export const deleteFlag = async (req, res) => {
         if (process.env.NODE_ENV === 'development') console.log(error);
         
         if (error.message === 'NOT_FOUND') {
-            return sendErrorResponse(
-                res,
-                404,
-                'Flag not found.'
-            );
+            return sendErrorResponse(res, 404, 'Flag not found.');
         }
         
-        return sendErrorResponse(
-            res,
-            500,
-            'Internal Server Error'
-        );
+        return sendErrorResponse(res, 500, 'Internal Server Error');
     }
 };
 
@@ -256,11 +197,7 @@ export const unfreezeContent = async (req, res) => {
         const result = await FlagModel.unfreezeContent(contentId);
         
         if (!result) {
-            return sendErrorResponse(
-                res,
-                404,
-                'Content not found.'
-            );
+            return sendErrorResponse(res, 404, 'Content not found.');
         }
         
         return res.status(200).json({
@@ -269,10 +206,6 @@ export const unfreezeContent = async (req, res) => {
     } catch (error) {
         if (process.env.NODE_ENV === 'development') console.log(error);
         
-        return sendErrorResponse(
-            res,
-            500,
-            'Internal Server Error'
-        );
+        return sendErrorResponse(res, 500, 'Internal Server Error');
     }
 };

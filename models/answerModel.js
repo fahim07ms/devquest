@@ -1,9 +1,12 @@
 import pool from '../db/pool.js';
 import { withTransaction } from '../db/client.js';
 
+// Get answers for a specific question
 const getAnswersByQuestionId = async (questionId, bypassFreeze = false) => {
+    // Frozen answers are not included in the results unless bypassFreeze is true
     const freezeFilter = bypassFreeze ? '' : 'AND c.is_frozen = FALSE';
     
+    // Query to get answers for a specific question
     const query = `
         SELECT
             a.content_id as id,
@@ -23,7 +26,7 @@ const getAnswersByQuestionId = async (questionId, bypassFreeze = false) => {
             ) as "author"
         FROM answer a
         JOIN content c ON a.content_id = c.content_id
-        JOIN profile p ON c.author_id = p.user_id
+        LEFT JOIN profile p ON c.author_id = p.user_id
         LEFT JOIN "user" u ON c.author_id = u.user_id
         WHERE a.question_id = $1 ${freezeFilter}
         ORDER BY
@@ -40,7 +43,9 @@ const getAnswersByQuestionId = async (questionId, bypassFreeze = false) => {
     return result.rows;
 };
 
+// Get a specific answer by its ID
 const getAnswerById = async (answerId, bypassFreeze = false) => {
+    // Frozen answers are not included in the results unless bypassFreeze is true
     const freezeFilter = bypassFreeze ? '' : 'AND c.is_frozen = FALSE';
     
     const query = `
@@ -75,20 +80,24 @@ const getAnswerById = async (answerId, bypassFreeze = false) => {
     return result.rows[0] || null;
 }
 
+// Create a new answer for a specific question
 const createAnswer = async (userId, questionId, body) => {
     const result = await withTransaction(async (client) => {
+        // Insert the answer content first
         const content = await client.query(
             `INSERT INTO content (content_type, author_id, body)
             VALUES ('answer', $1, $2) RETURNING *`,
             [userId, body]
         );
         
+        // Insert the answer record into the answer table
         const answerResult = await client.query(
             `INSERT INTO answer (question_id, content_id)
             VALUES ($1, $2) RETURNING *`,
             [questionId, content.rows[0]["content_id"]]
         );
         
+        // Update the question's answer_count and last_activity_at'
         await client.query(
             `UPDATE question SET answer_count = answer_count + 1, last_activity_at = NOW() WHERE content_id = $1`,
             [questionId]
@@ -101,8 +110,10 @@ const createAnswer = async (userId, questionId, body) => {
     return getAnswerById(result["content_id"]);
 };
 
+// Update an existing answer
 const updateAnswer = async (answerId, body, authorId) => {
     const result = await withTransaction(async (client) => {
+        // Update the answer content
         const updateContent = await client.query(
             `UPDATE content
             SET body = $1
@@ -131,8 +142,10 @@ const updateAnswer = async (answerId, body, authorId) => {
     return getAnswerById(result["content_id"]);
 };
 
+// Delete an answer
 const deleteAnswer = async (answerId, userId) => {
     const result = await withTransaction(async (client) => {
+        // Check if the answer exists and belongs to the user
         const check = await client.query(
             `SELECT c.author_id, a.question_id FROM content c
             JOIN answer a ON a.content_id = c.content_id
@@ -150,11 +163,13 @@ const deleteAnswer = async (answerId, userId) => {
         
         const questionId = check.rows[0].question_id;
         
+        // Delete the answer record from the answer table and the content table (cascaded)
         await client.query(
             `DELETE FROM content WHERE content_id = $1`,
             [answerId]
         );
         
+        // Decrement the question's answer_count and update last_activity_at'
         await client.query(
             `UPDATE question
             SET answer_count = GREATEST(answer_count - 1, 0), last_activity_at = NOW()
@@ -168,8 +183,10 @@ const deleteAnswer = async (answerId, userId) => {
     return result || null;
 };
 
+// Update the status of an answer (accepted/rejected)
 const updateAnswerStatus = async (answerId, isAccepted, acceptedAt) => {
     const result = await withTransaction(async (client) => {
+        // Update the answer status
         const updateAnswer = await client.query(
             `UPDATE answer
             SET is_accepted = $1, accepted_at = $2
@@ -182,6 +199,7 @@ const updateAnswerStatus = async (answerId, isAccepted, acceptedAt) => {
             throw new Error('NOT_FOUND');
         }
         
+        // Update the question's is_answered status
         await client.query(
             `UPDATE question
             SET is_answered = $1

@@ -2,6 +2,7 @@ import ContentModel from '../models/contentModel.js';
 import VoteModel from '../models/voteModel.js';
 import {sendErrorResponse} from "../utils/error.js";
 
+// Cast a vote on a content
 export const castVote = async (req, res) => {
     const { contentId, voteType } = req.body;
     
@@ -10,22 +11,14 @@ export const castVote = async (req, res) => {
         const content = await ContentModel.getContentById(contentId);
         
         if (!content) {
-            return sendErrorResponse(
-                res,
-                 404,
-                'Content not found.'
-            );
+            return sendErrorResponse(res, 404, 'Content not found.');
         }
         
         // Vote on the content
         const vote = await VoteModel.vote(contentId, req.userId, voteType);
         
         if (!vote) {
-            return sendErrorResponse(
-                res,
-                  424,
-                'Failed to cast vote.'
-            );
+            return sendErrorResponse(res, 424, 'Failed to cast vote.');
         }
         
         return res.status(200).json({
@@ -39,18 +32,10 @@ export const castVote = async (req, res) => {
         
         // Check if the user has already voted for this content
         if (error.code === '23505') {
-            return sendErrorResponse(
-                res,
-                  409,
-                'You have already voted for this content.'
-            )
+            return sendErrorResponse(res, 409, 'You have already voted for this content.')
         }
         
-        return sendErrorResponse(
-            res,
-             500,
-            'Internal Server Error'
-        );
+        return sendErrorResponse(res, 500, 'Internal Server Error');
     }
 };
 
@@ -87,11 +72,7 @@ export const updateVote = async (req, res) => {
         const updatedVote = await VoteModel.updateVote(voteId, voteType);
         
         if (!updatedVote) {
-            return sendErrorResponse(
-                res,
-                   424,
-                'Failed to update vote.'
-            );
+            return sendErrorResponse(res, 424, 'Failed to update vote.');
         }
         
         return res.status(200).json({
@@ -105,18 +86,10 @@ export const updateVote = async (req, res) => {
         if (process.env.NODE_ENV === 'development') console.log(error);
         
         if (error.message === 'NOT_FOUND') {
-            return sendErrorResponse(
-                res,
-                   404,
-                'Vote not found.'
-            );
+            return sendErrorResponse(res, 404, 'Vote not found.');
         }
         
-        return sendErrorResponse(
-            res,
-              500,
-            'Internal Server Error'
-        );
+        return sendErrorResponse(res, 500, 'Internal Server Error');
     }
 };
 
@@ -129,11 +102,7 @@ export const deleteVote = async (req, res) => {
         const deletedVote = await VoteModel.deleteVote(voteId, userId);
         
         if (!deletedVote) {
-            return sendErrorResponse(
-                res,
-                    424,
-                'Failed to delete vote.'
-            );
+            return sendErrorResponse(res, 424, 'Failed to delete vote.');
         }
         
         return res.status(200).json({
@@ -143,18 +112,10 @@ export const deleteVote = async (req, res) => {
         if (process.env.NODE_ENV === 'development') console.log(error);
         
         if (error.message === 'NOT_FOUND') {
-            return sendErrorResponse(
-                res,
-                    404,
-                'Vote not found.'
-            );
+            return sendErrorResponse(res, 404, 'Vote not found.');
         }
         
-        return sendErrorResponse(
-            res,
-               500,
-            'Internal Server Error'
-        );
+        return sendErrorResponse(res, 500, 'Internal Server Error');
     }
 }
 
@@ -167,11 +128,7 @@ export const getUserVoteOnContent = async (req, res) => {
         const vote = await VoteModel.getUserVoteForContent(contentId, userId);
         
         if (!vote) {
-            return sendErrorResponse(
-                res,
-                     404,
-                'Vote not found.'
-            );
+            return sendErrorResponse(res, 404, 'Vote not found.');
         }
         
         return res.status(200).json({
@@ -182,10 +139,6 @@ export const getUserVoteOnContent = async (req, res) => {
         })
     } catch (error) {
         if (process.env.NODE_ENV === 'development') console.log(error);
-        return sendErrorResponse(
-            res,
-              500,
-            'Internal Server Error'
-        );
+        return sendErrorResponse(res, 500, 'Internal Server Error');
     }
 }

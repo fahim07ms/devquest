@@ -2,13 +2,6 @@ import pool from '../db/pool.js';
 import { withTransaction } from '../db/client.js';
 
 // Shared select columns used across all flag queries.
-//
-// To correctly build deep-links for every content type we need the parent
-// question ID:
-//   • question  → f.content_id itself
-//   • answer    → answer.question_id (via LEFT JOIN answer)
-//   • comment   → comment.parent_id may point to a question OR an answer;
-//                 COALESCE(cm_ans.question_id, cm.parent_id) handles both.
 const FLAG_SELECT = `
     f.flag_id as id,
     f.content_id as "contentId",
@@ -41,10 +34,6 @@ const FLAG_SELECT = `
 `;
 
 // The FROM + JOIN block that every flag SELECT reuses.
-// LEFT JOIN answer   → resolves question_id for answer-type flags
-// LEFT JOIN comment  → gives us parent_id for comment-type flags
-// LEFT JOIN answer cm_ans → resolves the comment's parent to a question when the
-//                           parent is an answer rather than a question directly
 const FLAG_JOINS = `
     FROM flag f
     LEFT JOIN content c         ON c.content_id     = f.content_id
@@ -83,7 +72,7 @@ const createFlag = async (userId, { contentId, reason, flagCategory, suggestedDu
     return getFlagById(result.flag_id);
 };
 
-// Get single flag by ID
+// Get a single flag by ID
 const getFlagById = async (flagId) => {
     const query = `
         SELECT ${FLAG_SELECT},
@@ -96,12 +85,13 @@ const getFlagById = async (flagId) => {
     return result.rows[0] || null;
 };
 
-// Get all flags (moderator view) with optional status & category filters
+// Get all flags (moderator view) with optional status and category filters
 const getAllFlags = async ({ status, category, limit, offset }) => {
     let paramCount = 1;
     const params   = [];
     const conditions = [];
     
+    // Status and category filters are optional, so only add them to the query if they're provided
     if (status) {
         conditions.push(`f.status = $${paramCount++}`);
         params.push(status);
@@ -152,8 +142,8 @@ const getFlagsByContentId = async (contentId) => {
     return result.rows;
 };
 
-// Moderator reviews a flag: updates status + optional note.
-// When status is 'action_taken', the flagged content is frozen so it is no
+// Moderator reviews a flag: updates status and optional note.
+// When status is 'action_taken', the flagged content is frozen, so it is no
 // longer accessible to regular users.
 const reviewFlag = async (flagId, moderatorId, { status, moderatorNote }) => {
     const result = await withTransaction(async (client) => {
@@ -176,7 +166,6 @@ const reviewFlag = async (flagId, moderatorId, { status, moderatorNote }) => {
         const { flag_id, content_id } = updateResult.rows[0];
         
         // Freeze the content when the moderator decides to take action.
-        // This hides it from all public-facing queries immediately.
         if (status === 'action_taken') {
             await client.query(
                 `UPDATE content SET is_frozen = TRUE WHERE content_id = $1`,
@@ -185,7 +174,6 @@ const reviewFlag = async (flagId, moderatorId, { status, moderatorNote }) => {
         }
         
         // If the moderator reverses to a non-action status, unfreeze the content
-        // so the community can see it again.
         if (status !== 'action_taken') {
             await client.query(
                 `UPDATE content SET is_frozen = FALSE WHERE content_id = $1`,
@@ -200,7 +188,7 @@ const reviewFlag = async (flagId, moderatorId, { status, moderatorNote }) => {
     return getFlagById(result.flag_id);
 };
 
-// Explicitly unfreeze a piece of content (moderator action — separate from flag review)
+// Explicitly unfreeze a piece of content (moderator action)
 const unfreezeContent = async (contentId) => {
     const result = await pool.query(
         `UPDATE content SET is_frozen = FALSE WHERE content_id = $1 RETURNING content_id`,
@@ -209,7 +197,7 @@ const unfreezeContent = async (contentId) => {
     return result.rows[0] || null;
 };
 
-// Delete a flag (does NOT unfreeze the content — use unfreezeContent for that)
+// Delete a flag (does NOT unfreeze the content)
 const deleteFlag = async (flagId) => {
     const result = await withTransaction(async (client) => {
         const deleteResult = await client.query(

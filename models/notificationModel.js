@@ -1,9 +1,9 @@
 import pool from "../db/pool.js";
 
 const getNotifications = async (userId, limit = 20, offset = 0) => {
-    // We will join with the user table to get the actor's info (if any)
+    // Get notifications for a specific user with actor info (if any)
     const query = `
-        SELECT 
+        SELECT
             n.notification_id as "id",
             n.notification_type as "type",
             n.related_entity_id as "entityId",
@@ -25,6 +25,7 @@ const getNotifications = async (userId, limit = 20, offset = 0) => {
         LIMIT $2 OFFSET $3
     `;
 
+    // Count total notifications and unread notifications
     const countQuery = `SELECT COUNT(*) FROM notification WHERE recipient_user_id = $1`;
     const unreadCountQuery = `SELECT COUNT(*) FROM notification WHERE recipient_user_id = $1 AND is_read = false`;
 
@@ -47,6 +48,7 @@ const getNotifications = async (userId, limit = 20, offset = 0) => {
     }
 };
 
+// Mark a specific notification as read
 const markAsRead = async (notificationId, userId) => {
     const query = `
         UPDATE notification 
@@ -58,6 +60,7 @@ const markAsRead = async (notificationId, userId) => {
     return result.rowCount > 0;
 };
 
+// Mark all notifications as read for a specific user
 const markAllAsRead = async (userId) => {
     const query = `
         UPDATE notification 

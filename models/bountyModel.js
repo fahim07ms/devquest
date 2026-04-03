@@ -4,7 +4,7 @@ import pool from "../db/pool.js";
 // Create a new bounty on a question
 const createBounty = async (questionId, offeredBy, amount, reason) => {
     const result = await withTransaction(async (client) => {
-        // 1. Verify user has enough reputation
+        // Verify a user has enough reputations
         const userRes = await client.query(
             `SELECT reputation_points FROM "user" WHERE user_id = $1`,
             [offeredBy]
@@ -15,14 +15,8 @@ const createBounty = async (questionId, offeredBy, amount, reason) => {
         if (currentRep < amount) {
             throw new Error("INSUFFICIENT_REPUTATION");
         }
-
-        // 2. Deduct reputation from user
-        // await client.query(
-        //     `UPDATE "user" SET reputation_points = reputation_points - $1 WHERE user_id = $2`,
-        //     [amount, offeredBy]
-        // );
-
-        // 3. Insert into bounty
+        
+        // Insert into bounty
         const bountyRes = await client.query(
             `INSERT INTO bounty (question_id, offered_by, amount, reason, expires_at)
              VALUES ($1, $2, $3, $4, NOW() + INTERVAL '7 days')
@@ -32,7 +26,7 @@ const createBounty = async (questionId, offeredBy, amount, reason) => {
         
         const bounty = bountyRes.rows[0];
 
-        // 4. Record the reputation history
+        // Record the reputation history
         await client.query(
             `INSERT INTO reputation_history (user_id, change_amount, reason, related_entity_type, related_entity_id)
              VALUES ($1, $2, 'BOUNTY_OFFERED', 'bounty', $3)`,
@@ -48,7 +42,7 @@ const createBounty = async (questionId, offeredBy, amount, reason) => {
 // Award a bounty to an answer
 const awardBounty = async (bountyId, answerId, awardedBy) => {
     const result = await withTransaction(async (client) => {
-        // 1. Get bounty details
+        // Get bounty details
         const bountyRes = await client.query(
             `SELECT * FROM bounty WHERE bounty_id = $1 FOR UPDATE`,
             [bountyId]
@@ -56,10 +50,10 @@ const awardBounty = async (bountyId, answerId, awardedBy) => {
         if (bountyRes.rowCount === 0) throw new Error("NOT_FOUND");
         const bounty = bountyRes.rows[0];
 
-        // 2. Validate bounty state and permissions
+        // Validate bounty state and permissions
         if (bounty.status !== 'active') throw new Error("BOUNTY_NOT_ACTIVE");
 
-        // 3. Get the answer author
+        // Get the answer author
         const ansRes = await client.query(
             `SELECT c.author_id 
              FROM answer a
@@ -70,7 +64,7 @@ const awardBounty = async (bountyId, answerId, awardedBy) => {
         if (ansRes.rowCount === 0) throw new Error("ANSWER_NOT_FOUND");
         const answerAuthorId = ansRes.rows[0].author_id;
         
-        // 4. Update bounty status
+        // Update bounty status
         const updatedBounty = await client.query(
             `UPDATE bounty 
              SET status = 'awarded', awarded_answer_id = $1, awarded_at = NOW()
@@ -79,9 +73,9 @@ const awardBounty = async (bountyId, answerId, awardedBy) => {
             [answerId, bountyId]
         );
 
-        // 5. Grant reputation to the answer's author (if they exist)
+        // Grant reputation to the answer's author (if they exist)
         if (answerAuthorId) {
-            // 6. Record reputation history for the recipient
+            // Record reputation history for the recipient
             await client.query(
                 `INSERT INTO reputation_history (user_id, change_amount, reason, related_entity_type, related_entity_id)
                  VALUES ($1, $2, 'BOUNTY_AWARDED', 'bounty', $3)`,

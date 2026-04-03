@@ -1,8 +1,8 @@
 import {sendErrorResponse} from "../utils/error.js";
 import UserModel from "../models/userModel.js";
 import cloudinary from "../config/cloudinary.js";
-import pool from "../db/pool.js";
 
+// Get user details
 export const getUserDetails = async (req, res) => {
     try {
         const user = await UserModel.getUserById(req.userId);
@@ -31,7 +31,7 @@ export const getUserDetails = async (req, res) => {
     }
 }
 
-// Get Public Profile
+// Get Public Profile (Using username)
 export const getPublicProfile = async (req, res) => {
     const { username } = req.params;
     
@@ -156,7 +156,7 @@ export const uploadProfileImage = async (req, res) => {
     }
 }
 
-// Get user asked questions
+// Get user-asked questions
 export const getUserQuestions = async (req, res) => {
     const { username } = req.params;
     
@@ -179,7 +179,7 @@ export const getUserQuestions = async (req, res) => {
     }
 };
 
-// Get user answered questions
+// Get user-answered questions
 export const getUserAnswers = async (req, res) => {
     const { username } = req.params;
     
@@ -207,26 +207,10 @@ export const getUserBadges = async (req, res) => {
     const { username } = req.params;
     
     try {
-        const result = await pool.query(
-            `SELECT
-                ba.award_id       AS "badgeId",
-                b.name,
-                b.description,
-                b.badge_tier      AS "tier",
-                b.criteria_type   AS "criteriaType",
-                b.criteria_threshold AS "criteriaThreshold",
-                b.icon_url        AS "iconUrl",
-                ba.awarded_at     AS "awardedAt"
-             FROM badge_award ba
-             JOIN badge b ON ba.badge_id = b.badge_id
-             JOIN "user" u ON ba.user_id = u.user_id
-             WHERE u.username = $1
-             ORDER BY ba.awarded_at DESC`,
-            [username]
-        );
+        const result = await UserModel.getUserBadges(username);
         
         return res.status(200).json({
-            data: { badges: result.rows },
+            data: { badges: result },
             message: 'Badges fetched successfully.'
         });
     } catch (error) {
@@ -243,34 +227,10 @@ export const getMyReputationHistory = async (req, res) => {
     const offset = (page - 1) * limit;
     
     try {
-        const result = await pool.query(
-            `SELECT
-                history_id          AS "historyId",
-                change_amount       AS "changeAmount",
-                reason,
-                related_entity_type AS "relatedEntityType",
-                related_entity_id   AS "relatedEntityId",
-                created_at          AS "createdAt"
-             FROM reputation_history
-             WHERE user_id = $1
-             ORDER BY created_at DESC
-             LIMIT $2 OFFSET $3`,
-            [userId, limit, offset]
-        );
-        
-        const countRes = await pool.query(
-            `SELECT COUNT(*) FROM reputation_history WHERE user_id = $1`,
-            [userId]
-        );
-        
-        const total = parseInt(countRes.rows[0].count, 10);
+        const result = await UserModel.getUserReputationHistory(userId, limit, offset);
         
         return res.status(200).json({
-            data: {
-                history: result.rows,
-                total,
-                hasMore: offset + limit < total
-            },
+            data: result,
             message: 'Reputation history fetched successfully.'
         });
     } catch (error) {

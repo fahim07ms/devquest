@@ -25,5 +25,3 @@ router.get('/:username/answers', getUserAnswers);
 router.get('/:username/badges', getUserBadges);
 
 export default router;
-
-// GET    /api/users/:username/badges    — badges earned

@@ -1,10 +1,12 @@
 import pool from '../db/pool.js';
 
+// Get all tags
 const getAllTags = async () => {
     let tags = await pool.query('SELECT tag_id, name FROM tag');
     return tags.rows;
 }
 
+// Get tags with pagination and search
 const getDetailedTags = async ({ offset, limit, search }) => {
     let tags = await pool.query(`
         SELECT t.tag_id,

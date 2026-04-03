@@ -51,6 +51,7 @@ const checkBookmark = async (userId, contentId) => {
 
 // Get a user's bookmarked questions with pagination
 const getUserBookmarks = async (userId, limit, offset, bypassFreeze = false) => {
+    // Bypass freeze filter if requested
     const freezeFilter = bypassFreeze ? '' : 'AND c.is_frozen = FALSE';
     
     const query = `
@@ -95,6 +96,7 @@ const getUserBookmarks = async (userId, limit, offset, bypassFreeze = false) => 
         LIMIT $2 OFFSET $3
     `;
 
+    // Count total bookmarks for pagination
     const countQuery = `
         SELECT COUNT(*)
         FROM bookmark b

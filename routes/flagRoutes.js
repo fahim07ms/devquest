@@ -15,7 +15,7 @@ const router = express.Router();
 
 router.post('/', authMiddleware, validateBody(createFlagSchema), createFlag);
 
-// ── Moderator / Admin only ────────────────────────────────────────────────────
+// Moderator / Admin only
 router.get('/', authMiddleware, moderatorMiddleware, getAllFlags);
 router.get('/:flagId', authMiddleware, moderatorMiddleware, getFlagById);
 router.put('/:flagId/review', authMiddleware, moderatorMiddleware, validateBody(reviewFlagSchema), reviewFlag);

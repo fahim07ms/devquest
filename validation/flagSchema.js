@@ -6,7 +6,7 @@ const FLAG_STATUSES   = ['pending', 'reviewed', 'rejected', 'action_taken'];
 export const createFlagSchema = z.object({
     contentId: z.guid('Content ID must be a valid UUID.'),
     // Reason is always sent by the frontend — for non-"other" categories the
-    // frontend auto-fills "Flagged as <category>" so this is never truly empty.
+    // frontend autofills "Flagged as <category>" so this is never truly empty.
     reason: z.string().trim()
         .min(1,   'Reason cannot be empty.')
         .max(100, 'Reason must be 100 characters or fewer.'),
@@ -21,11 +21,11 @@ export const createFlagSchema = z.object({
         .optional(),
 }).refine(
     (data) => {
-        // If category is duplicate, suggestedDuplicateId must be provided
+        // If the category is duplicate, suggestedDuplicateId must be provided
         if (data.flagCategory === 'duplicate') {
             return !!data.suggestedDuplicateId;
         }
-        // If category is not duplicate, suggestedDuplicateId must be absent
+        // If the category is not duplicate, suggestedDuplicateId must be absent
         return !data.suggestedDuplicateId;
     },
     {

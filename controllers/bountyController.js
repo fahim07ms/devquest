@@ -8,16 +8,9 @@ export const createBounty = async (req, res) => {
     const { amount, reason } = req.body;
     const userId = req.userId;
     
+    // Check if the question exists
     if (!questionId) {
         return sendErrorResponse(res, 400, 'Question ID is required.');
-    }
-    
-    if (!amount || isNaN(amount) || amount <= 0) {
-        return sendErrorResponse(res, 400, 'Invalid bounty amount.');
-    }
-    
-    if (!reason || reason.trim().length === 0) {
-        return sendErrorResponse(res, 400, 'Bounty reason is required.');
     }
     
     try {

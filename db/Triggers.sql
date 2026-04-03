@@ -1,7 +1,3 @@
--- ============================================================
--- UTILITY TRIGGERS
--- ============================================================
-
 -- Shared function for updating `updated_at` on any table that has it
 CREATE OR REPLACE FUNCTION update_timestamp()
     RETURNS TRIGGER AS
@@ -27,11 +23,7 @@ CREATE TRIGGER trg_update_profile_timestamp
     FOR EACH ROW
 EXECUTE FUNCTION update_timestamp();
 
-
--- ============================================================
--- VOTE SCORE
--- ============================================================
-
+-- Insert/Update/Delete vote score whenever a vote is cast or removed or updated
 CREATE OR REPLACE FUNCTION update_vote_score()
     RETURNS TRIGGER AS
 $$
@@ -52,7 +44,7 @@ BEGIN
         WHERE content_id = OLD.content_id;
     END IF;
 
-    RETURN NULL; -- AFTER trigger, return value is ignored
+    RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -62,25 +54,20 @@ CREATE TRIGGER trg_update_vote_score
 EXECUTE FUNCTION update_vote_score();
 
 
--- ============================================================
--- ANSWER COUNT ON QUESTION
--- ============================================================
-
--- FIX: Was using NEW.content_id (the answer's ID) to look up the question.
---      Should use NEW.question_id (the foreign key pointing to the question).
+-- Answer count on question
 CREATE OR REPLACE FUNCTION update_answer_count()
     RETURNS TRIGGER AS
 $$
 BEGIN
     IF TG_OP = 'INSERT' THEN
         UPDATE question
-        SET answer_count     = answer_count + 1,
+        SET answer_count = answer_count + 1,
             last_activity_at = CURRENT_TIMESTAMP
         WHERE content_id = NEW.question_id;
 
     ELSIF TG_OP = 'DELETE' THEN
         UPDATE question
-        SET answer_count     = GREATEST(0, answer_count - 1),
+        SET answer_count = GREATEST(0, answer_count - 1),
             last_activity_at = CURRENT_TIMESTAMP
         WHERE content_id = OLD.question_id;
     END IF;
@@ -95,10 +82,7 @@ CREATE TRIGGER trg_update_answer_count
 EXECUTE FUNCTION update_answer_count();
 
 
--- ============================================================
--- BADGE COUNT ON USER
--- ============================================================
-
+-- Update badge count on a user when a badge is awarded or removed in the badge_award table
 CREATE OR REPLACE FUNCTION update_badge_count()
     RETURNS TRIGGER AS
 $$
@@ -124,12 +108,7 @@ CREATE TRIGGER trg_update_badge_count
 EXECUTE FUNCTION update_badge_count();
 
 
--- ============================================================
--- REPUTATION POINTS (driven by reputation_history)
--- NOTE: All reputation changes must go through reputation_history.
---       Do NOT manually UPDATE user.reputation_points elsewhere.
--- ============================================================
-
+-- Update user reputation points on a user when a reputation history record is inserted or deleted
 CREATE OR REPLACE FUNCTION update_reputation_points()
     RETURNS TRIGGER AS
 $$
@@ -140,7 +119,6 @@ BEGIN
         WHERE user_id = NEW.user_id;
 
     ELSIF TG_OP = 'DELETE' THEN
-        -- Reverting a history entry means reversing its effect
         UPDATE "user"
         SET reputation_points = GREATEST(0, reputation_points - OLD.change_amount)
         WHERE user_id = OLD.user_id;
@@ -155,15 +133,7 @@ CREATE TRIGGER trg_update_reputation_points
     FOR EACH ROW
 EXECUTE FUNCTION update_reputation_points();
 
-
--- ============================================================
--- VOTE REPUTATION — handles INSERT, UPDATE (vote flip), DELETE
--- ============================================================
--- The UPDATE case covers when a user switches vote direction
--- (e.g. upvote → downvote or vice versa via PUT /votes/:id).
--- Without this, flipping a vote leaves the old reputation_history
--- rows in place and never creates the corrected ones.
-
+-- Process reputation changes for a vote
 CREATE OR REPLACE FUNCTION process_vote_reputation() RETURNS TRIGGER AS $$
 DECLARE
     v_author_id    UUID;
@@ -172,17 +142,19 @@ DECLARE
     v_reason       reputation_reason;
 BEGIN
 
-    -- ── INSERT: new vote cast ─────────────────────────────────────────────────
+    -- INSERT: new vote cast
     IF TG_OP = 'INSERT' THEN
-        SELECT author_id, content_type
-        INTO v_author_id, v_content_type
-        FROM content WHERE content_id = NEW.content_id;
+        SELECT author_id, content_type INTO v_author_id, v_content_type
+        FROM content
+        WHERE content_id = NEW.content_id;
 
-        -- No rep change if content has no author or voter is the author
+        -- No reputation change if content has no author or voter is the author
         IF v_author_id IS NULL OR v_author_id = NEW.user_id THEN
             RETURN NULL;
         END IF;
 
+        -- When the content type is question/answer, add 10 reputation points to the author if upvote
+        -- Else when downvoted, subtract 2 reputation points from the author
         IF v_content_type = 'question' THEN
             v_rep_change := CASE WHEN NEW.vote_type = 1 THEN 10 ELSE -2 END;
             v_reason     := CASE WHEN NEW.vote_type = 1 THEN 'QUESTION_UPVOTED' ELSE 'QUESTION_DOWNVOTED' END;
@@ -203,13 +175,13 @@ BEGIN
         INSERT INTO reputation_history (user_id, change_amount, reason, related_entity_type, related_entity_id)
         VALUES (v_author_id, v_rep_change, v_reason, 'vote', NEW.vote_id);
 
-        -- ── UPDATE: vote direction flipped ────────────────────────────────────────
-        -- The vote row is the same (same vote_id), only vote_type changed.
+        -- UPDATE: a vote direction flipped
+        -- Same vote_id, only vote_type changed.
         -- We delete the old history entries and insert corrected ones.
     ELSIF TG_OP = 'UPDATE' AND OLD.vote_type != NEW.vote_type THEN
-        SELECT author_id, content_type
-        INTO v_author_id, v_content_type
-        FROM content WHERE content_id = NEW.content_id;
+        SELECT author_id, content_type INTO v_author_id, v_content_type
+        FROM content
+        WHERE content_id = NEW.content_id;
 
         IF v_author_id IS NULL OR v_author_id = NEW.user_id THEN
             RETURN NULL;
@@ -229,7 +201,7 @@ BEGIN
             v_rep_change := CASE WHEN NEW.vote_type = 1 THEN 10 ELSE -2 END;
             v_reason     := CASE WHEN NEW.vote_type = 1 THEN 'ANSWER_UPVOTED' ELSE 'ANSWER_DOWNVOTED' END;
 
-            -- Downvoting costs the voter 1 rep (if switching TO a downvote)
+            -- Downvoting costs the voter 1 rep
             IF NEW.vote_type = -1 THEN
                 INSERT INTO reputation_history (user_id, change_amount, reason, related_entity_type, related_entity_id)
                 VALUES (NEW.user_id, -1, 'DOWNVOTE_GIVEN', 'vote', NEW.vote_id);
@@ -241,7 +213,7 @@ BEGIN
         INSERT INTO reputation_history (user_id, change_amount, reason, related_entity_type, related_entity_id)
         VALUES (v_author_id, v_rep_change, v_reason, 'vote', NEW.vote_id);
 
-        -- ── DELETE: vote removed ──────────────────────────────────────────────────
+        -- DELETE: vote removed
     ELSIF TG_OP = 'DELETE' THEN
         -- Cascade-delete all history entries for this vote.
         -- The trg_update_reputation_points DELETE trigger reverses each one.
@@ -253,19 +225,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Re-create the trigger to include UPDATE
-DROP TRIGGER IF EXISTS trg_vote_reputation ON vote;
-
 CREATE TRIGGER trg_vote_reputation
     AFTER INSERT OR UPDATE OR DELETE ON vote
     FOR EACH ROW
 EXECUTE FUNCTION process_vote_reputation();
 
-
--- ============================================================
--- REPUTATION FROM ANSWER ACCEPTANCE
--- ============================================================
-
+-- Reputation points from answer acceptance
 CREATE OR REPLACE FUNCTION process_accept_reputation() RETURNS TRIGGER AS $$
 DECLARE
     v_answer_author   UUID;
@@ -280,7 +245,7 @@ BEGIN
             SELECT c.author_id INTO v_question_author
             FROM content c WHERE c.content_id = NEW.question_id;
 
-            -- No self-accept rep (though the controller should prevent this anyway)
+            -- Add 15 reputation points to the question author and 2 reputation points to the answer author
             IF v_answer_author IS NOT NULL AND v_answer_author != v_question_author THEN
                 INSERT INTO reputation_history (user_id, change_amount, reason, related_entity_type, related_entity_id)
                 VALUES (v_answer_author, 15, 'ANSWER_ACCEPTED', 'answer', NEW.content_id);
@@ -307,23 +272,21 @@ CREATE TRIGGER trg_accept_reputation
     FOR EACH ROW
 EXECUTE FUNCTION process_accept_reputation();
 
-
--- ============================================================
--- NOTIFICATIONS
--- ============================================================
-
--- Notify question author when a new answer is posted
+-- Notify the question author when a new answer is posted
 CREATE OR REPLACE FUNCTION notify_on_new_answer() RETURNS TRIGGER AS $$
 DECLARE
     v_answerer_id  UUID;
     v_questioner_id UUID;
 BEGIN
+    -- Select answerer
     SELECT author_id INTO v_answerer_id
     FROM content WHERE content_id = NEW.content_id;
 
+    -- Select questioner
     SELECT author_id INTO v_questioner_id
     FROM content WHERE content_id = NEW.question_id;
 
+    -- Notify the questioner if different from the answerer
     IF v_questioner_id IS NOT NULL AND v_questioner_id != v_answerer_id THEN
         INSERT INTO notification (recipient_user_id, actor_user_id, notification_type, related_entity_id, action_url)
         VALUES (
@@ -344,20 +307,22 @@ CREATE TRIGGER trg_notify_on_new_answer
     FOR EACH ROW
 EXECUTE FUNCTION notify_on_new_answer();
 
-
--- Notify answerer when their answer is accepted
+-- Notify the answerer when their answer is accepted
 CREATE OR REPLACE FUNCTION notify_on_answer_accepted() RETURNS TRIGGER AS $$
 DECLARE
     v_answerer_id   UUID;
     v_questioner_id UUID;
 BEGIN
     IF NEW.is_accepted = true AND OLD.is_accepted = false THEN
+        -- Select answerer
         SELECT author_id INTO v_answerer_id
         FROM content WHERE content_id = NEW.content_id;
 
+        -- Select questioner
         SELECT author_id INTO v_questioner_id
         FROM content WHERE content_id = NEW.question_id;
 
+        -- Notify the answerer if different from the questioner
         IF v_answerer_id IS NOT NULL AND v_questioner_id != v_answerer_id THEN
             INSERT INTO notification (recipient_user_id, actor_user_id, notification_type, related_entity_id, action_url)
             VALUES (
@@ -380,7 +345,7 @@ CREATE TRIGGER trg_notify_on_answer_accepted
 EXECUTE FUNCTION notify_on_answer_accepted();
 
 
--- Notify parent content author on new comment; also notify @mentioned user
+-- Notify parent content author on a new comment; also notify @mentioned user
 CREATE OR REPLACE FUNCTION notify_on_new_comment() RETURNS TRIGGER AS $$
 DECLARE
     v_parent_author UUID;
@@ -388,9 +353,10 @@ DECLARE
     v_question_id   UUID;
     v_actor_id      UUID;
 BEGIN
-    SELECT author_id, content_type
-    INTO v_parent_author, v_parent_type
-    FROM content WHERE content_id = NEW.parent_id;
+    -- Resolve which author this comment belongs to for the action_url
+    SELECT author_id, content_type INTO v_parent_author, v_parent_type
+    FROM content
+    WHERE content_id = NEW.parent_id;
 
     -- Resolve which question this comment belongs to for the action_url
     IF v_parent_type = 'answer' THEN
@@ -399,7 +365,10 @@ BEGIN
         v_question_id := NEW.parent_id;
     END IF;
 
-    SELECT author_id INTO v_actor_id FROM content WHERE content_id = NEW.content_id;
+    -- Resolve which user this comment belongs to for the action_url
+    SELECT author_id INTO v_actor_id
+    FROM content
+    WHERE content_id = NEW.content_id;
 
     -- Notify parent author
     IF v_parent_author IS NOT NULL AND v_parent_author != v_actor_id THEN
@@ -413,7 +382,7 @@ BEGIN
                );
     END IF;
 
-    -- Notify @mentioned user (recipient_id) if different from parent author and actor
+    -- Notify @mentioned user (recipient_id) if different from the parent author and actor
     IF NEW.recipient_id IS NOT NULL
         AND NEW.recipient_id != v_actor_id
         AND NEW.recipient_id != v_parent_author
@@ -437,13 +406,14 @@ CREATE TRIGGER trg_notify_on_new_comment
     FOR EACH ROW
 EXECUTE FUNCTION notify_on_new_comment();
 
-
 -- Notify user when they earn a badge
 CREATE OR REPLACE FUNCTION notify_on_badge_earned() RETURNS TRIGGER AS $$
 DECLARE
     v_username VARCHAR(50);
 BEGIN
-    SELECT username INTO v_username FROM "user" WHERE user_id = NEW.user_id;
+    SELECT username INTO v_username
+    FROM "user"
+    WHERE user_id = NEW.user_id;
 
     INSERT INTO notification (recipient_user_id, actor_user_id, notification_type, related_entity_id, action_url)
     VALUES (
@@ -463,8 +433,7 @@ CREATE TRIGGER trg_notify_on_badge_earned
     FOR EACH ROW
 EXECUTE FUNCTION notify_on_badge_earned();
 
-
--- Notify answer author when a bounty is awarded to their answer
+-- Notify the answer author when a bounty is awarded to their answer
 CREATE OR REPLACE FUNCTION notify_on_bounty_awarded() RETURNS TRIGGER AS $$
 DECLARE
     v_answer_author UUID;
@@ -496,18 +465,13 @@ CREATE TRIGGER trg_notify_on_bounty_awarded
     FOR EACH ROW
 EXECUTE FUNCTION notify_on_bounty_awarded();
 
-
--- ============================================================
--- BADGE EVALUATION ENGINE
--- ============================================================
-
 -- Called manually or from trigger hooks to evaluate and award eligible badges
 CREATE OR REPLACE FUNCTION check_and_award_badges(p_user_id UUID) RETURNS void AS $$
 DECLARE
     r_badge    RECORD;
     v_user_val INTEGER := 0;
 BEGIN
-    -- Only evaluate badges the user hasn't earned yet
+    -- Use cursor to select all badges that haven't been awarded yet
     FOR r_badge IN
         SELECT * FROM badge
         WHERE badge_id NOT IN (
@@ -516,24 +480,37 @@ BEGIN
         LOOP
             v_user_val := 0;
 
+            -- For each badge, count how much the user meets the criteria
             IF r_badge.criteria_type = 'question_count' THEN
                 SELECT COUNT(*) INTO v_user_val
-                FROM content WHERE content_type = 'question' AND author_id = p_user_id AND deleted_at IS NULL;
+                FROM content
+                WHERE content_type = 'question'
+                    AND author_id = p_user_id
+                    AND deleted_at IS NULL;
 
             ELSIF r_badge.criteria_type = 'answer_count' THEN
                 SELECT COUNT(*) INTO v_user_val
-                FROM content WHERE content_type = 'answer' AND author_id = p_user_id AND deleted_at IS NULL;
+                FROM content
+                WHERE content_type = 'answer'
+                    AND author_id = p_user_id
+                    AND deleted_at IS NULL;
 
             ELSIF r_badge.criteria_type = 'total_votes_received' THEN
                 SELECT COALESCE(SUM(vote_score), 0) INTO v_user_val
-                FROM content WHERE author_id = p_user_id AND deleted_at IS NULL;
+                FROM content
+                WHERE author_id = p_user_id
+                    AND deleted_at IS NULL;
 
             ELSIF r_badge.criteria_type = 'answer_score' THEN
                 SELECT COALESCE(MAX(vote_score), 0) INTO v_user_val
-                FROM content WHERE content_type = 'answer' AND author_id = p_user_id AND deleted_at IS NULL;
+                FROM content
+                WHERE content_type = 'answer'
+                    AND author_id = p_user_id
+                    AND deleted_at IS NULL;
 
             END IF;
 
+            -- If the user meets the criteria, award the badge
             IF v_user_val >= r_badge.criteria_threshold THEN
                 INSERT INTO badge_award (user_id, badge_id)
                 VALUES (p_user_id, r_badge.badge_id);
@@ -542,9 +519,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
--- Evaluate badges when a user posts content
-CREATE OR REPLACE FUNCTION trigger_evaluate_badges_content() RETURNS TRIGGER AS $$
+-- Evaluate badges when a user posts content (question/answer/comment)
+CREATE OR REPLACE FUNCTION trigger_evaluate_badges_content()
+    RETURNS TRIGGER AS
+$$
 BEGIN
     IF NEW.author_id IS NOT NULL THEN
         PERFORM check_and_award_badges(NEW.author_id);
@@ -564,7 +542,9 @@ CREATE OR REPLACE FUNCTION trigger_evaluate_badges_vote() RETURNS TRIGGER AS $$
 DECLARE
     v_author_id UUID;
 BEGIN
-    SELECT author_id INTO v_author_id FROM content WHERE content_id = NEW.content_id;
+    SELECT author_id INTO v_author_id
+    FROM content
+    WHERE content_id = NEW.content_id;
 
     IF v_author_id IS NOT NULL THEN
         PERFORM check_and_award_badges(v_author_id);
@@ -579,8 +559,7 @@ CREATE TRIGGER trg_eval_badges_vote
     FOR EACH ROW
 EXECUTE FUNCTION trigger_evaluate_badges_vote();
 
-
-
+-- Expire the bounties that have expired or became stale
 CREATE OR REPLACE FUNCTION expire_stale_bounties() RETURNS void AS $$
 BEGIN
     UPDATE bounty

@@ -1,6 +1,7 @@
 import { withTransaction } from "../db/client.js";
 import pool from "../db/pool.js";
 
+// Get comments for a specific parent comment
 const getCommentsByParentId = async (parentId, bypassFreeze = false) => {
     const freezeFilter = bypassFreeze ? '' : 'AND c.is_frozen = FALSE';
     
@@ -41,6 +42,7 @@ const getCommentsByParentId = async (parentId, bypassFreeze = false) => {
     return result.rows;
 };
 
+// Get a specific comment by its ID
 const getCommentById = async (commentId, bypassFreeze = false) => {
     const freezeFilter = bypassFreeze ? '' : 'AND c.is_frozen = FALSE';
     
@@ -86,6 +88,7 @@ const getCommentById = async (commentId, bypassFreeze = false) => {
     };
 };
 
+// Create a new comment under a specific parent comment
 const createComment = async (userId, parentId, recipientId, body) => {
     const result = await withTransaction(async (client) => {
         const content = await client.query(
@@ -107,6 +110,7 @@ const createComment = async (userId, parentId, recipientId, body) => {
     return getCommentById(result["content_id"]);
 }
 
+// Update an existing comment
 const updateComment = async (commentId, body, authorId) => {
     const result = await withTransaction(async (client) => {
         const updateContent = await client.query(
@@ -128,6 +132,7 @@ const updateComment = async (commentId, body, authorId) => {
     return getCommentById(result["content_id"]);
 };
 
+// Delete a comment
 const deleteComment = async (commentId, userId) => {
     const result = await withTransaction(async (client) => {
         const check = await client.query(
