@@ -14,7 +14,7 @@ export default function RSLayout({
 
     useEffect(() => {
         if (isAuthenticated) {
-            router.push('/questions');
+            router.push('/dashboard');
         }
     }, [isAuthenticated, router]);
 

@@ -32,7 +32,7 @@ import {
 import { Button } from '@/components/ui/button'
 
 const navItems = [
-    { label: 'Home',      href: '/',          icon: HouseIcon },
+    { label: 'Home',      href: '/dashboard',          icon: HouseIcon },
     { label: 'Questions', href: '/questions',  icon: ListBulletsIcon },
     { label: 'Tags',      href: '/tags',       icon: TagIcon },
 ]

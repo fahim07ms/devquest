@@ -37,7 +37,7 @@ function SignInPage() {
 
     // Search params and from prop for redirecting after successful login
     const searchParams = useSearchParams();
-    const from = searchParams.get('from') || '/questions';
+    const from = searchParams.get('from') || '/dashboard';
 
     const form = useForm<LoginInput>({
         resolver: zodResolver(loginSchema),

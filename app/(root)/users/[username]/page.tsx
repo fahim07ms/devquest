@@ -20,7 +20,7 @@ import {
     ChatDotsIcon,
     ArrowUpIcon,
     CheckCircleIcon,
-    ArrowLeftIcon,
+    ArrowLeftIcon, XIcon
 } from '@phosphor-icons/react'
 import {UserProfilePageSkeleton} from "@/components/skeleton/UserProfilePageSkeleton";
 import {ProfileAvatar} from "@/components/users/ProfileAvatar";
@@ -84,6 +84,14 @@ function StatPill({ icon: Icon, label, value }: { icon: React.ElementType; label
     )
 }
 
+interface FollowedTag {
+    tag_id: string
+    name: string
+    description: string | null
+    questionCount: string
+    followedAt: string
+}
+
 export default function UserProfilePage() {
     const params   = useParams()
     const username  = params.username as string
@@ -99,9 +107,13 @@ export default function UserProfilePage() {
     const [mounted,     setMounted]     = useState(false)
     const [editOpen,    setEditOpen]    = useState(false)
 
-    // Track if auxiliary tabs haven't been fetched yet (lazy load)
+    const [followedTags,    setFollowedTags]    = useState<FollowedTag[]>([])
+    const [unfollowingTagIds, setUnfollowingTagIds] = useState<Set<string>>(new Set())
+
+    // Track if auxiliary tabs have been fetched yet (lazy load)
     const [badgesFetched,     setBadgesFetched]     = useState(false)
     const [reputationFetched, setReputationFetched] = useState(false)
+    const [tagsFetched,       setTagsFetched]       = useState(false)
 
     const isOwnProfile = isAuthenticated && authUser?.username === username
 
@@ -164,6 +176,34 @@ export default function UserProfilePage() {
         setProfile((prev) => (prev ? { ...prev, ...updated } : prev))
     }
 
+    // Lazy-fetch followed tags when tab is activated (own profile only)
+    useEffect(() => {
+        if (activeTab !== 'tags' || tagsFetched || !isOwnProfile) return
+        const fetchFollowedTags = async () => {
+            try {
+                const res = await api.get('/tags/followed')
+                setFollowedTags(res.data.data.tags ?? [])
+                setTagsFetched(true)
+            } catch {
+                toast.error('Failed to load followed tags.')
+            }
+        }
+        fetchFollowedTags()
+    }, [activeTab, tagsFetched, isOwnProfile])
+
+    const handleUnfollowTag = async (tagId: string, tagName: string) => {
+        setUnfollowingTagIds(prev => new Set(prev).add(tagId))
+        try {
+            await api.delete(`/tags/${tagId}/follow`)
+            setFollowedTags(prev => prev.filter(t => t.tag_id !== tagId))
+            toast.success(`Unfollowed #${tagName}`)
+        } catch {
+            toast.error('Failed to unfollow tag.')
+        } finally {
+            setUnfollowingTagIds(prev => { const next = new Set(prev); next.delete(tagId); return next })
+        }
+    }
+
     const displayName = profile
         ? [profile.firstName, profile.lastName].filter(Boolean).join(' ') || profile.username
         : username
@@ -182,8 +222,12 @@ export default function UserProfilePage() {
         { key: 'questions',  label: 'Questions',  count: questions.length },
         { key: 'answers',    label: 'Answers',    count: answers.length },
         { key: 'badges',     label: 'Badges',     count: profile?.badgeCount },
-        ...(isOwnProfile ? [{ key: 'reputation' as ActiveTab, label: 'Reputation' }] : []),
+        ...(isOwnProfile ? [
+            { key: 'tags'       as ActiveTab, label: 'Tags',       count: followedTags.length > 0 || tagsFetched ? followedTags.length : undefined },
+            { key: 'reputation' as ActiveTab, label: 'Reputation' },
+        ] : []),
     ]
+
 
     if (isLoading) {
         return <UserProfilePageSkeleton />;
@@ -410,6 +454,73 @@ export default function UserProfilePage() {
                         )}
                     </div>
                 )}
+
+                {/* ── Tags tab (own profile only) ── */}
+                {activeTab === 'tags' && isOwnProfile && (
+                    <div>
+                        <div className="flex items-center justify-between mb-5">
+                            <p className="text-xs text-muted-foreground/60 leading-relaxed">
+                                Tags you follow shape your dashboard feed.
+                            </p>
+                            <a
+                                href="/tags"
+                                className="text-xs text-primary hover:underline underline-offset-2 flex-shrink-0 ml-3"
+                            >
+                                Browse all tags →
+                            </a>
+                        </div>
+
+                        {!tagsFetched ? (
+                            <div className="flex flex-wrap gap-2">
+                                {Array.from({ length: 6 }).map((_, i) => (
+                                    <div key={i} className="h-8 w-20 bg-muted animate-pulse" style={{ opacity: 1 - i * 0.12 }} />
+                                ))}
+                            </div>
+                        ) : followedTags.length === 0 ? (
+                            <div className="text-center py-16 border border-dashed border-border/50">
+                                <p className="text-sm text-muted-foreground">No tags followed yet.</p>
+                                <p className="text-xs text-muted-foreground/50 mt-1">
+                                    Follow tags to personalise your dashboard.
+                                </p>
+                                <a href="/tags" className="text-xs text-primary hover:underline mt-2 block">
+                                    Explore tags →
+                                </a>
+                            </div>
+                        ) : (
+                            <div className="flex flex-wrap gap-2">
+                                {followedTags.map((tag, i) => (
+                                    <div
+                                        key={tag.tag_id}
+                                        className="opacity-0 animate-fade-up"
+                                        style={{ animationDelay: `${i * 30}ms`, animationFillMode: 'forwards' }}
+                                    >
+                                        <span className={cn(
+                                            'inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium font-mono',
+                                            'border border-primary/20 bg-primary/8 text-primary',
+                                            'transition-colors duration-150'
+                                        )}>
+                                            #{tag.name}
+                                            <button
+                                                type="button"
+                                                disabled={unfollowingTagIds.has(tag.tag_id)}
+                                                onClick={() => handleUnfollowTag(tag.tag_id, tag.name)}
+                                                title={`Unfollow #${tag.name}`}
+                                                className="flex-shrink-0 text-primary/50 hover:text-destructive transition-colors duration-150 disabled:opacity-40"
+                                            >
+                                                {unfollowingTagIds.has(tag.tag_id) ? (
+                                                    <div className="h-3 w-3 border border-current border-t-transparent animate-spin" />
+                                                ) : (
+                                                    <XIcon className="h-3 w-3" weight="bold" />
+                                                )}
+                                            </button>
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
 
                 {/* ── Reputation tab (own profile only) ── */}
                 {activeTab === 'reputation' && isOwnProfile && (
