@@ -27,6 +27,10 @@ export const createFlag = async (req, res) => {
     } catch (error) {
         if (process.env.NODE_ENV === 'development') console.log(error);
         
+        if (error.message === 'CONTENT_NOT_FOUND') {
+            return sendErrorResponse(res, 404, 'Content not found.');
+        }
+        
         if (error.message === 'ALREADY_FLAGGED') {
             return sendErrorResponse(res, 409, 'You have already flagged this content.');
         }
@@ -124,13 +128,6 @@ export const reviewFlag = async (req, res) => {
     const { status, moderatorNote } = req.body;
     
     try {
-        // Check if the flag exists
-        const flag = await FlagModel.getFlagById(flagId);
-        
-        if (!flag) {
-            return sendErrorResponse(res, 404, 'Flag not found.');
-        }
-        
         // Update the flag status and optionally add a moderator note
         const updatedFlag = await FlagModel.reviewFlag(flagId, moderatorId, {
             status,
@@ -150,7 +147,7 @@ export const reviewFlag = async (req, res) => {
     } catch (error) {
         if (process.env.NODE_ENV === 'development') console.log(error);
         
-        if (error.message === 'NOT_FOUND') {
+        if (error.message === 'FLAG_NOT_FOUND') {
             return sendErrorResponse(res, 404, 'Flag not found.');
         }
         

@@ -44,34 +44,6 @@ const FLAG_JOINS = `
     LEFT JOIN "user" moderator  ON f.moderator_id   = moderator.user_id
 `;
 
-// Create a flag
-const createFlag = async (userId, { contentId, reason, flagCategory, suggestedDuplicateId }) => {
-    const result = await withTransaction(async (client) => {
-        // Prevent a user from flagging the same content twice
-        const existing = await client.query(
-            `SELECT flag_id FROM flag WHERE user_id = $1 AND content_id = $2`,
-            [userId, contentId]
-        );
-        
-        if (existing.rowCount > 0) {
-            throw new Error('ALREADY_FLAGGED');
-        }
-        
-        const flagResult = await client.query(
-            `INSERT INTO flag
-                (user_id, content_id, reason, flag_category, suggested_duplicate_id)
-             VALUES ($1, $2, $3, $4, $5)
-             RETURNING flag_id`,
-            [userId, contentId, reason, flagCategory, suggestedDuplicateId ?? null]
-        );
-        
-        return flagResult.rows[0];
-    });
-    
-    if (!result) return null;
-    return getFlagById(result.flag_id);
-};
-
 // Get a single flag by ID
 const getFlagById = async (flagId) => {
     const query = `
@@ -129,6 +101,19 @@ const getAllFlags = async ({ status, category, limit, offset }) => {
     };
 };
 
+// Create a flag
+const createFlag = async (userId, { contentId, reason, flagCategory, suggestedDuplicateId }) => {
+    const result = await pool.query(
+        `CALL create_flag($1, $2, $3, $4, $5, NULL)`,
+        [userId, contentId, reason, flagCategory, suggestedDuplicateId ?? null]
+    );
+    
+    const flagId = result.rows[0]['p_flag_id'];
+    
+    if (!flagId) return null;
+    return getFlagById(flagId);
+};
+
 // Get all flags on a specific piece of content
 const getFlagsByContentId = async (contentId) => {
     const query = `
@@ -146,54 +131,25 @@ const getFlagsByContentId = async (contentId) => {
 // When status is 'action_taken', the flagged content is frozen, so it is no
 // longer accessible to regular users.
 const reviewFlag = async (flagId, moderatorId, { status, moderatorNote }) => {
-    const result = await withTransaction(async (client) => {
-        const updateResult = await client.query(
-            `UPDATE flag
-             SET
-                status         = $1,
-                moderator_id   = $2,
-                moderator_note = $3,
-                updated_at     = NOW()
-             WHERE flag_id = $4
-             RETURNING flag_id, content_id`,
-            [status, moderatorId, moderatorNote ?? null, flagId]
-        );
-        
-        if (updateResult.rowCount === 0) {
-            throw new Error('NOT_FOUND');
-        }
-        
-        const { flag_id, content_id } = updateResult.rows[0];
-        
-        // Freeze the content when the moderator decides to take action.
-        if (status === 'action_taken') {
-            await client.query(
-                `UPDATE content SET is_frozen = TRUE WHERE content_id = $1`,
-                [content_id]
-            );
-        }
-        
-        // If the moderator reverses to a non-action status, unfreeze the content
-        if (status !== 'action_taken') {
-            await client.query(
-                `UPDATE content SET is_frozen = FALSE WHERE content_id = $1`,
-                [content_id]
-            );
-        }
-        
-        return { flag_id };
-    });
+    const result = await pool.query(
+        `CALL review_flag($1, $2, $3, $4, NULL)`,
+        [flagId, moderatorId, status, moderatorNote ?? null]
+    );
     
-    if (!result) return null;
-    return getFlagById(result.flag_id);
+    const updatedFlagId = result.rows[0]['p_updated_flag'];
+    
+    if (!updatedFlagId) return null;
+    return getFlagById(updatedFlagId);
 };
 
 // Explicitly unfreeze a piece of content (moderator action)
 const unfreezeContent = async (contentId) => {
-    const result = await pool.query(
-        `UPDATE content SET is_frozen = FALSE WHERE content_id = $1 RETURNING content_id`,
-        [contentId]
-    );
+    const result = await withTransaction(async (client) => {
+        return await client.query(
+            `UPDATE content SET is_frozen = FALSE WHERE content_id = $1 RETURNING content_id`,
+            [contentId]
+        );
+    })
     return result.rows[0] || null;
 };
 

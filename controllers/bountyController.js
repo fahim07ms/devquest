@@ -1,5 +1,4 @@
 import BountyModel from '../models/bountyModel.js';
-import pool from '../db/pool.js';
 import { sendErrorResponse } from '../utils/error.js';
 
 // Create a bounty on a question
@@ -16,6 +15,10 @@ export const createBounty = async (req, res) => {
     try {
         const bounty = await BountyModel.createBounty(questionId, userId, parseInt(amount), reason.trim());
         
+        if (!bounty) {
+            return sendErrorResponse(res, 424, 'Failed to create bounty.');
+        }
+        
         return res.status(201).json({
             data: { bounty },
             message: 'Bounty created successfully.'
@@ -27,9 +30,12 @@ export const createBounty = async (req, res) => {
             return sendErrorResponse(res, 400, 'Not enough reputation to offer this bounty.');
         }
         
-        // Foreign key violation — question doesn't exist
-        if (error.code === '23503') {
+        if (error.message === 'QUESTION_NOT_FOUND') {
             return sendErrorResponse(res, 404, 'Question not found.');
+        }
+        
+        if (error.message === 'USER_NOT_FOUND') {
+            return sendErrorResponse(res, 404, 'User not found.');
         }
         
         return sendErrorResponse(res, 500, 'Internal Server Error');
@@ -47,27 +53,10 @@ export const awardBounty = async (req, res) => {
     }
     
     try {
-        // Verify the requester is either the bounty offerer or a moderator/admin
-        const bountyCheck = await pool.query(
-            `SELECT offered_by FROM bounty WHERE bounty_id = $1`,
-            [bountyId]
-        );
-        
-        if (bountyCheck.rowCount === 0) {
-            return sendErrorResponse(res, 404, 'Bounty not found.');
-        }
-        
-        const isOfferer = bountyCheck.rows[0].offered_by === userId;
-        const isModerator = ['moderator', 'admin'].includes(req.role);
-        
-        if (!isOfferer && !isModerator) {
-            return sendErrorResponse(res, 403, 'Only the bounty offerer can award it.');
-        }
-        
         const bounty = await BountyModel.awardBounty(bountyId, answerId, userId);
         
         return res.status(200).json({
-            data: { bounty },
+            data: { bounty: bounty },
             message: 'Bounty awarded successfully.'
         });
     } catch (error) {
@@ -76,8 +65,11 @@ export const awardBounty = async (req, res) => {
         if (error.message === 'BOUNTY_NOT_ACTIVE') {
             return sendErrorResponse(res, 400, 'Bounty is no longer active.');
         }
-        if (error.message === 'NOT_FOUND') {
+        if (error.message === 'BOUNTY_NOT_FOUND') {
             return sendErrorResponse(res, 404, 'Bounty not found.');
+        }
+        if (error.message === 'UNAUTHORIZED') {
+            return sendErrorResponse(res, 403, 'You are not authorized to award this bounty.');
         }
         if (error.message === 'ANSWER_NOT_FOUND') {
             return sendErrorResponse(res, 404, 'Answer not found or does not belong to this question.');

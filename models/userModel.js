@@ -133,7 +133,7 @@ const getQuestionsByUsername = async (username) => {
             c.vote_score as "voteScore",
             c.created_at as "createdAt",
             c.updated_at as "updatedAt",
-            q.answer_count as "answerCount",
+            q.answer_count as "answersCount",
             q.view_count as "viewCount",
             q.last_activity_at as "lastActivityAt",
             q.is_answered as "isAnswered",

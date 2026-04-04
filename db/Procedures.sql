@@ -333,3 +333,177 @@ CREATE OR REPLACE PROCEDURE delete_comment(
         RETURNING content_id INTO p_deleted_comment;
     END;
 $$ LANGUAGE plpgsql;
+
+-------------------------------------
+-- FLAG PROCEDURES
+-------------------------------------
+-- Create a flag
+CREATE OR REPLACE PROCEDURE create_flag(
+    p_user_id UUID,
+    p_content_id UUID,
+    p_reason VARCHAR(100),
+    p_flag_category flag_category,
+    p_suggested_duplicate UUID,
+    OUT p_flag_id UUID
+) AS $$
+    BEGIN
+        -- Check if the content exists
+        IF NOT EXISTS (
+            SELECT 1 FROM content
+            WHERE content_id = p_content_id
+        ) THEN
+            RAISE EXCEPTION 'CONTENT_NOT_FOUND';
+        END IF;
+
+        -- Prevent a user from flagging the same content twice
+        IF EXISTS (
+            SELECT 1 FROM flag
+            WHERE user_id = p_user_id
+                AND content_id = p_content_id
+        ) THEN
+            RAISE EXCEPTION 'ALREADY_FLAGGED';
+        END IF;
+
+        -- Insert into the flag table
+        INSERT INTO flag (user_id, content_id, reason, flag_category, suggested_duplicate_id)
+        VALUES (p_user_id, p_content_id, p_reason, p_flag_category, p_suggested_duplicate)
+        RETURNING flag_id INTO p_flag_id;
+    END;
+$$ LANGUAGE plpgsql;
+
+-- Review a flag
+CREATE OR REPLACE PROCEDURE review_flag(
+    p_flag_id UUID,
+    p_moderator_id UUID,
+    p_status flag_status,
+    p_moderator_note TEXT,
+    OUT p_updated_flag UUID
+) AS $$
+    DECLARE
+        v_content_id UUID;
+    BEGIN
+        -- Check if the flag exists
+        IF NOT EXISTS (
+            SELECT 1 FROM flag
+            WHERE flag_id = p_flag_id
+        ) THEN
+            RAISE EXCEPTION 'FLAG_NOT_FOUND';
+        END IF;
+
+        -- Update the flag
+        UPDATE flag
+        SET status = p_status, moderator_id = p_moderator_id, moderator_note = p_moderator_note, updated_at = CURRENT_TIMESTAMP
+        WHERE flag_id = p_flag_id
+        RETURNING flag_id, content_id INTO p_updated_flag, v_content_id;
+
+        -- Freeze the content when the moderator decides to take action
+        IF p_status = 'action_taken' THEN
+            UPDATE content
+            SET is_frozen = true
+            WHERE content_id = v_content_id;
+        -- When the moderator reverses to a non-action status, unfreeze the content
+        ELSIF p_status != 'action_taken' THEN
+            UPDATE content
+            SET is_frozen = false
+            WHERE content_id = v_content_id;
+        END IF;
+    END;
+$$ LANGUAGE plpgsql;
+
+-------------------------------------
+-- FLAG PROCEDURES
+-------------------------------------
+-- Create a bounty
+CREATE OR REPLACE PROCEDURE create_bounty(
+    p_question_id UUID,
+    p_amount INTEGER,
+    p_offered_by UUID,
+    p_reason TEXT,
+    OUT p_bounty_id UUID
+) AS $$
+    DECLARE
+        v_offerer_reputation INTEGER;
+    BEGIN
+        -- Check if the question exists
+        IF NOT EXISTS (
+            SELECT 1 FROM content
+            WHERE content_id = p_question_id
+                AND content_type = 'question'
+        ) THEN
+            RAISE EXCEPTION 'QUESTION_NOT_FOUND';
+        END IF;
+
+        -- Check offerer has enough reputation points
+        SELECT reputation_points INTO v_offerer_reputation
+        FROM "user"
+        WHERE user_id = p_offered_by;
+
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'USER_NOT_FOUND';
+        END IF;
+
+        IF v_offerer_reputation < p_amount THEN
+            RAISE EXCEPTION 'INSUFFICIENT_REPUTATION';
+        END IF;
+
+        -- Insert into the bounty table
+        INSERT INTO bounty (question_id, amount, offered_by, reason, expires_at)
+        VALUES (p_question_id, p_amount, p_offered_by, p_reason, NOW() + INTERVAL '7 days')
+        RETURNING bounty_id INTO p_bounty_id;
+
+        -- Record the reputation change
+        INSERT INTO reputation_history(user_id, change_amount, reason, related_entity_type, related_entity_id)
+        VALUES (p_offered_by, -p_amount, 'BOUNTY_OFFERED', 'bounty', p_bounty_id);
+    END;
+$$ LANGUAGE plpgsql;
+
+-- Award bounty
+CREATE OR REPLACE PROCEDURE award_bounty(
+    p_bounty_id UUID,
+    p_answer_id UUID,
+    p_awarded_by UUID,
+    OUT p_awarded_bounty_id UUID
+) AS $$
+    DECLARE
+        v_bounty_status bounty_status;
+        v_answer_author_id UUID;
+        v_bounty_amount INTEGER;
+        v_bounty_awarded_by UUID;
+    BEGIN
+        -- Check if the bounty exists and is active
+        SELECT status, amount, offered_by INTO v_bounty_status, v_bounty_amount, v_bounty_awarded_by
+        FROM bounty
+        WHERE bounty_id = p_bounty_id;
+
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'BOUNTY_NOT_FOUND';
+        END IF;
+
+        IF v_bounty_status != 'active' THEN
+            RAISE EXCEPTION 'BOUNTY_NOT_ACTIVE';
+        END IF;
+
+        IF p_awarded_by != v_bounty_awarded_by THEN
+            RAISE EXCEPTION 'UNAUTHORIZED';
+        END IF;
+
+        -- Get the answer author
+        SELECT c.author_id INTO v_answer_author_id
+        FROM answer a
+        JOIN content c ON c.content_id = a.content_id
+        WHERE a.content_id = p_answer_id;
+
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'ANSWER_NOT_FOUND';
+        END IF;
+
+        -- Update bounty status
+        UPDATE bounty
+        SET status = 'awarded', awarded_answer_id = p_answer_id, awarded_at = CURRENT_TIMESTAMP
+        WHERE bounty_id = p_bounty_id;
+
+        -- Grant reputation to the answer's author
+        INSERT INTO reputation_history(user_id, change_amount, reason, related_entity_type, related_entity_id)
+        VALUES (v_answer_author_id, v_bounty_amount, 'BOUNTY_AWARDED', 'bounty', p_bounty_id);
+    END;
+$$ LANGUAGE plpgsql;
