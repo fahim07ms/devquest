@@ -82,105 +82,36 @@ const getAnswerById = async (answerId, bypassFreeze = false) => {
 
 // Create a new answer for a specific question
 const createAnswer = async (userId, questionId, body) => {
-    const result = await withTransaction(async (client) => {
-        // Insert the answer content first
-        const content = await client.query(
-            `INSERT INTO content (content_type, author_id, body)
-            VALUES ('answer', $1, $2) RETURNING *`,
-            [userId, body]
-        );
-        
-        // Insert the answer record into the answer table
-        const answerResult = await client.query(
-            `INSERT INTO answer (question_id, content_id)
-            VALUES ($1, $2) RETURNING *`,
-            [questionId, content.rows[0]["content_id"]]
-        );
-        
-        // Update the question's answer_count and last_activity_at'
-        await client.query(
-            `UPDATE question SET answer_count = answer_count + 1, last_activity_at = NOW() WHERE content_id = $1`,
-            [questionId]
-        );
-        
-        return answerResult.rows[0];
-    });
+    const result = await pool.query(
+        `CALL create_answer($1, $2, $3, NULL)`,
+        [questionId, body, userId]
+    );
     
-    if (!result) return null;
-    return getAnswerById(result["content_id"]);
+    const answerId = result.rows[0]['p_answer_id'];
+    
+    if (!answerId) return null;
+    return getAnswerById(answerId);
 };
 
 // Update an existing answer
 const updateAnswer = async (answerId, body, authorId) => {
-    const result = await withTransaction(async (client) => {
-        // Update the answer content
-        const updateContent = await client.query(
-            `UPDATE content
-            SET body = $1
-            WHERE content_id = $2 AND author_id = $3
-            RETURNING content_id, body, created_at, updated_at, author_id, vote_score`,
-            [body, answerId, authorId]
-        );
-        
-        if (updateContent.rowCount === 0) {
-            throw new Error('UNAUTHORIZED_OR_NOT_FOUND');
-        }
-        
-        // Update last_activity_at on the parent question
-        await client.query(
-            `UPDATE question
-            SET last_activity_at = NOW()
-            WHERE content_id = (SELECT question_id FROM answer WHERE content_id = $1)`,
-            [answerId]
-        );
-        
-        return updateContent.rows[0]
-            ;
-    });
+    const result = await pool.query(
+        `CALL update_answer($1, $2, $3, NULL)`,
+        [answerId, body, authorId]
+    );
     
-    if (!result) return null;
-    return getAnswerById(result["content_id"]);
+    if (!result.rows[0]['p_updated_answer']) return null;
+    return getAnswerById(answerId);
 };
 
 // Delete an answer
 const deleteAnswer = async (answerId, userId) => {
-    const result = await withTransaction(async (client) => {
-        // Check if the answer exists and belongs to the user
-        const check = await client.query(
-            `SELECT c.author_id, a.question_id FROM content c
-            JOIN answer a ON a.content_id = c.content_id
-            WHERE c.content_id = $1`,
-            [answerId]
-        );
-        
-        if (check.rowCount === 0) {
-            throw new Error('NOT_FOUND');
-        }
-        
-        if (check.rows[0].author_id !== userId) {
-            throw new Error('UNAUTHORIZED');
-        }
-        
-        const questionId = check.rows[0].question_id;
-        
-        // Delete the answer record from the answer table and the content table (cascaded)
-        await client.query(
-            `DELETE FROM content WHERE content_id = $1`,
-            [answerId]
-        );
-        
-        // Decrement the question's answer_count and update last_activity_at'
-        await client.query(
-            `UPDATE question
-            SET answer_count = GREATEST(answer_count - 1, 0), last_activity_at = NOW()
-            WHERE content_id = $1`,
-            [questionId]
-        );
-        
-        return { id: answerId };
-    });
+    const result = await pool.query(
+        `CALL delete_answer($1, $2, NULL)`,
+        [answerId, userId]
+    );
     
-    return result || null;
+    return result.rows[0]['p_deleted_answer'] || null;
 };
 
 // Update the status of an answer (accepted/rejected)

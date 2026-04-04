@@ -71,26 +71,11 @@ export const createAnswer = async (req, res) => {
     const { body } = req.body;
     
     try {
-        // Check if the question exists
-        const question = await QuestionModel.getQuestionById(questionId);
-        
-        if (!question) {
-            return sendErrorResponse(
-                res,
-                404,
-                'Question not found.'
-            );
-        }
-        
         // Create the answer
         const answer = await AnswerModel.createAnswer(req.userId, questionId, body);
         
         if (!answer) {
-            return sendErrorResponse(
-                res,
-                424,
-                'Failed to create answer.'
-            );
+            return sendErrorResponse(res, 424, 'Failed to create answer.');
         }
         
         return res.status(201).json({
@@ -99,6 +84,10 @@ export const createAnswer = async (req, res) => {
         });
     } catch (error) {
         if (process.env.NODE_ENV === 'development') console.log(error);
+        
+        if (error.message === 'QUESTION_NOT_FOUND')
+            return sendErrorResponse(res, 404, 'Question not found.');
+        
         return sendErrorResponse(
             res,
             500,
@@ -114,18 +103,6 @@ export const editAnswer = async (req, res) => {
     const userId = req.userId;
     
     try {
-        // Check if the answer exists
-        const answer = await AnswerModel.getAnswerById(answerId);
-        
-        if (!answer) {
-            return sendErrorResponse(res, 404, 'Answer not found.');
-        }
-        
-        // Check if the user is the author of the answer
-        if (answer.author.authorId !== userId) {
-            return sendErrorResponse(res, 403, 'You are not authorized to edit this answer.');
-        }
-        
         // Update the answer
         const updatedAnswer = await AnswerModel.updateAnswer(answerId, body, userId);
         
@@ -142,8 +119,12 @@ export const editAnswer = async (req, res) => {
     } catch (error) {
         if (process.env.NODE_ENV === 'development') console.log(error);
         
-        if (error.message === 'UNAUTHORIZED_OR_NOT_FOUND') {
-            return sendErrorResponse(res, 403, 'You are not authorized to edit this answer or answer not found.');
+        if (error.message === 'NOT_FOUND') {
+            return sendErrorResponse(res, 404, 'Answer not found.');
+        }
+        
+        if (error.message === 'UNAUTHORIZED') {
+            return sendErrorResponse(res, 403, 'You are not authorized to edit this answer.');
         }
         
         return sendErrorResponse(
@@ -160,27 +141,11 @@ export const deleteAnswer = async (req, res) => {
     const userId = req.userId;
     
     try {
-        // Check if the answer exists
-        const answer = await AnswerModel.getAnswerById(answerId);
-        
-        if (!answer) {
-            return sendErrorResponse(res, 404, 'Answer not found.');
-        }
-        
-        // Only allow the author to delete the answer
-        if (answer.author.authorId !== userId) {
-            return sendErrorResponse(res, 403, 'You are not authorized to delete this answer.');
-        }
-        
         // Delete the answer
         const deleted = await AnswerModel.deleteAnswer(answerId, userId);
         
         if (!deleted) {
-            return sendErrorResponse(
-                res,
-                424,
-                'Failed to delete answer.'
-            );
+            return sendErrorResponse(res, 424, 'Failed to delete answer.');
         }
         
         return res.status(200).json({

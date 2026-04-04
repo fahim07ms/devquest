@@ -48,15 +48,7 @@ export const register = async (req, res) => {
         const passwordHash = await bcrypt.hash(password, 12);
         
         // Create the user
-        const user = await authModel.registerUser(username, email, passwordHash);
-        
-        if (!user) {
-            return sendErrorResponse(
-                res,
-                424,
-                'Failed to create user.'
-            )
-        }
+        await authModel.registerUser(username, email, passwordHash);
         
         return res.status(201).json({
             message: "User created successfully."
@@ -70,18 +62,10 @@ export const register = async (req, res) => {
             if (e.detail.includes('username')) message = 'Username already exists.';
             if (e.detail.includes('email')) message = 'Email already exists.';
             
-            return sendErrorResponse(
-                res,
-                400,
-                message
-            );
+            return sendErrorResponse(res, 400, message);
         }
         
-        return sendErrorResponse(
-            res,
-            500,
-            "Internal server error."
-        );
+        return sendErrorResponse(res, 500, "Internal server error.");
     }
 }
 

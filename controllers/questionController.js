@@ -101,30 +101,22 @@ export const editQuestion = async (req, res) => {
     const userId = req.userId;
     
     try {
-        const question = await QuestionModel.getQuestionById(questionId);
-        if (!question) {
-            return sendErrorResponse(res, 404, 'Question not found.');
-        }
-        
-        // Verify that the user is the author
-        if (question.author.authorId !== userId) {
-            return sendErrorResponse(res, 403, 'You are not authorized to edit this question.');
-        }
-        
         const updatedQuestion = await QuestionModel.updateQuestion(questionId, title, body, tags, userId);
         if (!updatedQuestion) {
             return sendErrorResponse(res, 424, 'Failed to update question.');
         }
         
         return res.status(200).json({
-            data: { question: updatedQuestion }
+            data: { question: updatedQuestion },
+            message: 'Question updated successfully.'
         });
     } catch (error) {
         if (process.env.NODE_ENV === 'development') console.error(error);
         
-        if (error.message === 'UNAUTHORIZED_OR_NOT_FOUND') {
+        if (error.message === 'NOT_FOUND')
+            return sendErrorResponse(res, 404, 'Question not found.');
+        if (error.message === 'UNAUTHORIZED')
             return sendErrorResponse(res, 403, 'You are not authorized to edit this question.');
-        }
         
         return sendErrorResponse(res, 500, 'Internal Server Error');
     }
@@ -146,7 +138,8 @@ export const deleteQuestion = async (req, res) => {
     } catch (error) {
         if (process.env.NODE_ENV === 'development') console.error(error);
         
-        if (error.message === 'NOT_FOUND')   return sendErrorResponse(res, 404, 'Question not found.');
+        
+        if (error.message === 'NOT_FOUND' || error.code === '22P02')   return sendErrorResponse(res, 404, 'Question not found.');
         if (error.message === 'UNAUTHORIZED') return sendErrorResponse(res, 403, 'You are not authorized to delete this question.');
         
         return sendErrorResponse(res, 500, 'Internal Server Error');

@@ -90,28 +90,10 @@ export const createComment = async (req, res) => {
     const { body, recipientId } = req.body;
     
     try {
-        // Validate that the parent exists
-        let parent = null;
-        if (parentType === 'answer') { parent = await AnswerModel.getAnswerById(parentId); }
-        if (parentType === 'question') { parent = await QuestionModel.getQuestionById(parentId); }
-        if (parentType === 'comment') { parent = await CommentModel.getCommentById(parentId); }
-        
-        if (!parent) {
-            return sendErrorResponse(
-                res,
-                 404,
-                `${parentType?.toUpperCase()} not found.`
-            )
-        }
-        
-        const comment = await CommentModel.createComment(req.userId, parentId, recipientId, body);
+        const comment = await CommentModel.createComment(req.userId, parentId, recipientId, body, parentType);
         
         if (!comment) {
-            return sendErrorResponse(
-                res,
-                424,
-                'Failed to create comment.'
-            )
+            return sendErrorResponse(res, 424, 'Failed to create comment.');
         }
         
         return res.status(201).json({
@@ -122,6 +104,13 @@ export const createComment = async (req, res) => {
         })
     } catch (error) {
         if (process.env.NODE_ENV === 'development') console.log(error);
+        
+        if (error.message === 'PARENT_NOT_FOUND') {
+            return sendErrorResponse(res, 404, `${parentType?.toUpperCase()} not found.`);
+        }
+        
+        if (error.message === 'RECIPIENT_NOT_FOUND')
+            return sendErrorResponse(res, 404, 'Recipient Not Found');
         
         return sendErrorResponse(
             res,
@@ -138,33 +127,10 @@ export const editComment = async (req, res) => {
     const userId = req.userId;
     
     try {
-        const comment = await CommentModel.getCommentById(commentId);
-        
-        if (!comment) {
-            return sendErrorResponse(
-                res,
-                 404,
-                'Comment not found.'
-            )
-        }
-        
-        // Check if the user is the author of the comment
-        if (comment.author.authorId !== userId) {
-            return sendErrorResponse(
-                res,
-                 403,
-                'You are not authorized to edit this comment.'
-            )
-        }
-        
         const updatedComment = await CommentModel.updateComment(commentId, body, userId);
         
         if (!updatedComment) {
-            return sendErrorResponse(
-                res,
-                  424,
-                'Failed to update comment.'
-            )
+            return sendErrorResponse(res, 424, 'Failed to update comment.');
         }
         
         return res.status(200).json({
@@ -175,12 +141,12 @@ export const editComment = async (req, res) => {
     } catch (error) {
         if (process.env.NODE_ENV === 'development') console.log(error);
         
-        if (error.message === 'UNAUTHORIZED_OR_NOT_FOUND') {
-            return sendErrorResponse(
-                res,
-                  403,
-                'You are not authorized to edit this comment.'
-            )
+        if (error.message === 'NOT_FOUND') {
+            return sendErrorResponse(res, 404, 'Comment not found.');
+        }
+        
+        if (error.message === 'UNAUTHORIZED') {
+            return sendErrorResponse(res, 403, 'You are not authorized to edit this comment.');
         }
         
         return sendErrorResponse(
@@ -197,31 +163,10 @@ export const deleteComment = async (req, res) => {
     const userId = req.userId;
     
     try {
-        const comment = await CommentModel.getCommentById(commentId);
-        
-        if (!comment) {
-            return sendErrorResponse(
-                res,
-                  404,
-                'Comment not found.'
-            )
-        }
-        
-        if (comment.author.authorId !== userId) {
-            return sendErrorResponse(
-                res,
-                   403,
-                'You are not authorized to delete this comment.'
-            )
-        }
-        
         const deleted = await CommentModel.deleteComment(commentId, userId);
         
         if (!deleted) {
-            return sendErrorResponse(
-                res,
-                   424,
-                'Failed to delete comment.'
+            return sendErrorResponse(res,424, 'Failed to delete comment.'
             )
         }
         
@@ -232,25 +177,13 @@ export const deleteComment = async (req, res) => {
         if (process.env.NODE_ENV === 'development') console.log(error);
         
         if (error.message === 'NOT_FOUND') {
-            return sendErrorResponse(
-                res,
-                   404,
-                'Comment not found.'
-            )
+            return sendErrorResponse(res, 404, 'Comment not found.');
         }
         
         if (error.message === 'UNAUTHORIZED') {
-            return sendErrorResponse(
-                res,
-                    403,
-                'You are not authorized to delete this comment.'
-            )
+            return sendErrorResponse(res, 403, 'You are not authorized to delete this comment.');
         }
         
-        return sendErrorResponse(
-            res,
-            500,
-            'Internal Server Error',
-        )
+        return sendErrorResponse(res, 500, 'Internal Server Error');
     }
 };

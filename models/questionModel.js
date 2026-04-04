@@ -189,99 +189,37 @@ const getQuestionById = async (id, bypassFreeze = false) => {
 
 // Create a new question
 const createQuestion = async (userId, title, body, tags) => {
-    const result = await withTransaction(async (client) => {
-        // Create the content
-        const content = await client.query(
-            `INSERT INTO content (content_type, author_id, body)
-             VALUES ('question', $1, $2) RETURNING *`,
-            [userId, body]
-        );
-        
-        // Insert into question with the content id
-        const qnResult = await client.query(
-            `INSERT INTO question (content_id, title)
-             VALUES ($1, $2) RETURNING *`,
-            [content.rows[0]['content_id'], title]
-        );
-        
-        // Insert question tag pair
-        for (const tag of tags) {
-            await client.query(
-                `INSERT INTO question_tag (question_id, tag_id) VALUES ($1, $2)`,
-                [qnResult.rows[0]['content_id'], tag['tag_id']]
-            );
-        }
-        
-        return {
-            id: qnResult.rows[0]['content_id'],
-            authorId: content.rows[0]['author_id'],
-            title: qnResult.rows[0]['title'],
-            body: content.rows[0]['body'],
-            voteScore: content.rows[0]['vote_score'],
-            createdAt: content.rows[0]['created_at'],
-            updatedAt: content.rows[0]['updated_at'],
-            viewCount: qnResult.rows[0]['view_count'],
-            answersCount: qnResult.rows[0]['answer_count'],
-            lastActivityAt: qnResult.rows[0]['last_activity_at'],
-            tags,
-        };
-    });
+    const tagIds = tags.map(tag => tag['tag_id']);
     
-    return result || null;
+    const result = await pool.query(
+        `CALL create_question($1, $2, $3, $4, NULL)`,
+        [title, body, userId, tagIds]
+    );
+    
+    const questionId = result.rows[0]['p_question_id'];
+    
+    return await getQuestionById(questionId);
 };
 
 // Update question body, title and tags
 const updateQuestion = async (questionId, title, body, tags, authorId) => {
-    const result = await withTransaction(async (client) => {
-        // Update content items
-        const updateContent = await client.query(
-            `UPDATE content
-             SET body = $1
-             WHERE content_id = $2 AND author_id = $3
-             RETURNING content_id, body, created_at, updated_at, author_id, vote_score`,
-            [body, questionId, authorId]
-        );
-        
-        if (updateContent.rowCount === 0) throw new Error('UNAUTHORIZED_OR_NOT_FOUND');
-        
-        // Update question title and last_activity
-        const updateQ = await client.query(
-            `UPDATE question
-             SET title = $1, last_activity_at = NOW()
-             WHERE content_id = $2
-             RETURNING view_count, answer_count, last_activity_at, title`,
-            [title, questionId]
-        );
-        
-        return { ...updateContent.rows[0], ...updateQ.rows[0] };
-    });
-    
-    if (!result) return null;
-    return getQuestionById(result['content_id']);
+   const result = await pool.query(
+       `CALL update_question($1, $2, $3, $4, NULL)`,
+       [questionId, title, body, authorId]
+   );
+   
+   if (!result.rows[0]['p_updated_question']) return null;
+   return await getQuestionById(questionId);
 };
 
 // Delete question
 const deleteQuestion = async (questionId, userId) => {
-    const result = await withTransaction(async (client) => {
-        // Check if the question exists or not
-        const check = await client.query(
-            `SELECT c.author_id FROM content c WHERE c.content_id = $1`,
-            [questionId]
-        );
-        
-        if (check.rows.length === 0) throw new Error('NOT_FOUND');
-        if (check.rows[0]['author_id'] !== userId) throw new Error('UNAUTHORIZED');
-        
-        // Delete it from content (question cascaded)
-        const deleted = await client.query(
-            `DELETE FROM content WHERE content_id = $1 RETURNING content_id`,
-            [questionId]
-        );
-        
-        return deleted.rows[0] || null;
-    });
+    const result = await pool.query(
+        `CALL delete_question($1, $2, NULL)`,
+        [questionId, userId]
+    );
     
-    return result || null;
+    return result.rows[0]['p_deleted_question'] || null;
 };
 
 // Increment view count

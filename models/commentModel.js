@@ -89,74 +89,37 @@ const getCommentById = async (commentId, bypassFreeze = false) => {
 };
 
 // Create a new comment under a specific parent comment
-const createComment = async (userId, parentId, recipientId, body) => {
-    const result = await withTransaction(async (client) => {
-        const content = await client.query(
-            `INSERT INTO content (content_type, author_id, body)
-            VALUES ('comment', $1, $2) RETURNING *`,
-            [userId, body]
-        );
-        
-        const commentResult = await client.query(
-            `INSERT INTO comment (parent_id, content_id, recipient_id)
-            VALUES ($1, $2, $3) RETURNING *`,
-            [parentId, content.rows[0]["content_id"], recipientId]
-        );
-        
-        return commentResult.rows[0];
-    });
+const createComment = async (userId, parentId, recipientId, body, parentType) => {
+    const result = await pool.query(
+        `CALL create_comment($1, $2, $3, $4, $5, NULL)`,
+        [parentId, recipientId, body, userId, parentType]
+    );
     
-    if (!result) return null;
-    return getCommentById(result["content_id"]);
+    const commentId = result.rows[0]['p_comment_id'];
+    if (!commentId) return null;
+    return getCommentById(commentId);
 }
 
 // Update an existing comment
 const updateComment = async (commentId, body, authorId) => {
-    const result = await withTransaction(async (client) => {
-        const updateContent = await client.query(
-            `UPDATE content
-            SET body = $1, updated_at = NOW()
-            WHERE content_id = $2 AND author_id = $3
-            RETURNING content_id, body, created_at, updated_at, author_id, vote_score`,
-            [body, commentId, authorId]
-        );
-        
-        if (updateContent.rowCount === 0) {
-            throw new Error('UNAUTHORIZED_OR_NOT_FOUND');
-        }
-        
-        return updateContent.rows[0];
-    });
+    const result = await pool.query(
+        `CALL update_comment($1, $2, $3, NULL)`,
+        [commentId, body, authorId]
+    );
     
-    if (!result) return null;
-    return getCommentById(result["content_id"]);
+    const updatedCommentId = result.rows[0]['p_updated_comment'];
+    if (!updatedCommentId) return null;
+    return getCommentById(updatedCommentId);
 };
 
 // Delete a comment
 const deleteComment = async (commentId, userId) => {
-    const result = await withTransaction(async (client) => {
-        const check = await client.query(
-            `SELECT c.author_id FROM content c WHERE c.content_id = $1`,
-            [commentId]
-        );
-        
-        if (check.rowCount === 0) {
-            throw new Error('NOT_FOUND');
-        }
-        
-        if (check.rows[0]['author_id'] !== userId) {
-            throw new Error('UNAUTHORIZED');
-        }
-        
-        await client.query(
-            `DELETE FROM content WHERE content_id = $1`,
-            [commentId]
-        );
-        
-        return { id: commentId };
-    });
+    const result = await pool.query(
+        `CALL delete_comment($1, $2, NULL)`,
+        [commentId, userId]
+    );
     
-    return result || null;
+    return result.rows[0]['p_deleted_comment'] || null;
 };
 
 export default {
