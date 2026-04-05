@@ -4,46 +4,11 @@ import Tag from './tagModel.js';
 // Aggregated stats for the authenticated user's dashboard header
 const getUserStats = async (userId) => {
     const result = await pool.query(
-        `SELECT
-            u.username,
-            u.reputation_points  AS "reputationPoints",
-            u.badge_count        AS "badgeCount",
-            u.created_at         AS "createdAt",
-            p.first_name         AS "firstName",
-            p.last_name          AS "lastName",
-            p.profile_picture    AS "profilePicture",
-            (SELECT
-                COUNT(*)
-            FROM content
-            WHERE content_type = 'question'
-                AND author_id = $1
-                AND deleted_at IS NULL
-            ) as "questionCount",
-            (SELECT
-                COUNT(*)
-            FROM content
-            WHERE content_type = 'answer'
-                AND author_id = $1
-                AND deleted_at IS NULL
-            ) as "answerCount",
-            (SELECT
-                COUNT(*)
-            FROM user_tag_follow
-            WHERE user_id = $1
-            ) as "followedTagCount",
-            (SELECT
-                COUNT(*)
-            FROM answer a
-                JOIN content c ON a.content_id = c.content_id
-            WHERE c.author_id = $1
-                AND a.is_accepted = true
-            ) as "acceptedAnswerCount"
-        FROM "user" u
-        LEFT JOIN profile p ON u.user_id = p.user_id
-        WHERE u.user_id = $1`,
+        `SELECT get_user_stats($1) AS stats`,
         [userId]
     );
-    return result.rows[0] ?? null;
+    
+    return result.rows[0].stats ?? null;
 };
 
 // Questions feed — filtered by followed tags (or all questions if none followed)
@@ -66,26 +31,17 @@ const getFeedQuestions = async ({ userId, limit, offset }) => {
     
     const feedQuery = `
         SELECT
-            c.content_id            AS "id",
+            c.content_id as "id",
             q.title,
             c.body,
-            q.view_count            AS "viewCount",
-            q.answer_count          AS "answersCount",
-            q.last_activity_at      AS "lastActivityAt",
-            c.vote_score            AS "voteScore",
-            c.created_at            AS "createdAt",
-            c.updated_at            AS "updatedAt",
-            c.is_frozen             AS "isFrozen",
-            (
-                SELECT jsonb_build_object(
-                    'id',        b.bounty_id,
-                    'amount',    b.amount,
-                    'expiresAt', b.expires_at
-                )
-                FROM bounty b
-                WHERE b.question_id = q.content_id AND b.status = 'active'
-                LIMIT 1
-            ) AS "activeBounty",
+            q.view_count as "viewCount",
+            q.answer_count as "answersCount",
+            q.last_activity_at as "lastActivityAt",
+            c.vote_score as "voteScore",
+            c.created_at as "createdAt",
+            c.updated_at as "updatedAt",
+            c.is_frozen as "isFrozen",
+            get_active_bounty(q.content_id) AS "activeBounty",
             jsonb_build_object(
                 'authorId',       c.author_id,
                 'username',       u.username,
@@ -93,12 +49,7 @@ const getFeedQuestions = async ({ userId, limit, offset }) => {
                 'lastName',       p.last_name,
                 'profilePicture', p.profile_picture
             ) AS "author",
-            (
-                SELECT ARRAY_AGG(jsonb_build_object('tag_id', t.tag_id, 'name', t.name))
-                FROM question_tag qt2
-                JOIN tag t ON qt2.tag_id = t.tag_id
-                WHERE qt2.question_id = q.content_id
-            ) AS "tags"
+            get_question_tags(q.content_id) AS "tags"
         FROM question q
         JOIN content c ON q.content_id = c.content_id
         LEFT JOIN profile p ON c.author_id = p.user_id

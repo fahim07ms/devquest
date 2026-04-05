@@ -31,16 +31,7 @@ const getQuestions = async (limit, offset, sortBy, sortOrder, tags, search, answ
             c.created_at as "createdAt",
             c.updated_at as "updatedAt",
             c.is_frozen as "isFrozen",
-            (
-                SELECT jsonb_build_object(
-                               'id',        b.bounty_id,
-                               'amount',    b.amount,
-                               'expiresAt', b.expires_at
-                       )
-                FROM bounty b
-                WHERE b.question_id = q.content_id AND b.status = 'active'
-                LIMIT 1
-            ) as "activeBounty",
+            get_active_bounty(q.content_id) as "activeBounty",
             jsonb_build_object(
                     'authorId',      c.author_id,
                     'username',      u.username,
@@ -48,15 +39,7 @@ const getQuestions = async (limit, offset, sortBy, sortOrder, tags, search, answ
                     'lastName',      p.last_name,
                     'profilePicture', p.profile_picture
             ) as "author",
-            (
-                SELECT ARRAY_AGG(jsonb_build_object(
-                        'tag_id', t.tag_id,
-                        'name',   t.name
-                                 ))
-                FROM question_tag qt
-                         JOIN tag t ON qt.tag_id = t.tag_id
-                WHERE qt.question_id = q.content_id
-            ) AS "tags"
+            get_question_tags(q.content_id) AS "tags"
         FROM question q
                  JOIN content c ON q.content_id = c.content_id
                  LEFT JOIN profile p ON c.author_id = p.user_id

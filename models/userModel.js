@@ -48,7 +48,8 @@ const getUserByUsername = async (username) => {
             p.profile_picture as "profilePicture",
             p.website as "website",
             p.birth_date as "birthDate",
-            u.created_at as "createdAt"
+            u.created_at as "createdAt",
+            get_user_acceptance_rate(u.user_id) as "acceptanceRate"
         FROM "user" u
         JOIN profile p ON u.user_id = p.user_id
         WHERE username = $1
@@ -137,12 +138,7 @@ const getQuestionsByUsername = async (username) => {
             q.view_count as "viewCount",
             q.last_activity_at as "lastActivityAt",
             q.is_answered as "isAnswered",
-            (
-                SELECT ARRAY_AGG(jsonb_build_object('tag_id', t.tag_id, 'name', t.name))
-                FROM question_tag qt
-                JOIN tag t ON qt.tag_id = t.tag_id
-                WHERE qt.question_id = q.content_id
-            ) as tags
+            get_question_tags(q.content_id) as tags
         FROM question q
             JOIN content c ON c.content_id = q.content_id
             JOIN "user" u ON u.user_id = c.author_id

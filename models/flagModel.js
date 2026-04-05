@@ -13,8 +13,7 @@ const FLAG_SELECT = `
     f.created_at as "createdAt",
     f.updated_at as "updatedAt",
     c.is_frozen as "isFrozen",
-    -- Resolve the parent question ID regardless of content type so the
-    -- frontend can build the correct deep-link every time.
+    -- Resolve the parent question ID regardless of content type
     CASE
         WHEN c.content_type = 'question' THEN f.content_id
         WHEN c.content_type = 'answer'   THEN ans.question_id

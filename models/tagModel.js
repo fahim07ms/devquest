@@ -1,4 +1,5 @@
 import pool from '../db/pool.js';
+import {withTransaction} from "../db/client.js";
 
 // Get all tags
 const getAllTags = async () => {
@@ -41,8 +42,8 @@ const getFollowedTags = async (userId) => {
             t.tag_id,
             t.name,
             t.description,
-            COUNT(qt.question_id) AS "questionCount",
-            utf.followed_at        AS "followedAt"
+            COUNT(qt.question_id) as "questionCount",
+            utf.followed_at as "followedAt"
         FROM user_tag_follow utf
         JOIN tag t ON utf.tag_id = t.tag_id
         LEFT JOIN question_tag qt ON qt.tag_id = t.tag_id
@@ -69,20 +70,24 @@ const followTag = async (userId, tagId) => {
     const tagCheck = await pool.query(`SELECT tag_id FROM tag WHERE tag_id = $1`, [tagId]);
     if (tagCheck.rowCount === 0) throw new Error('TAG_NOT_FOUND');
     
-    await pool.query(
-        `INSERT INTO user_tag_follow (user_id, tag_id)
-         VALUES ($1, $2)
-         ON CONFLICT (user_id, tag_id) DO NOTHING`,
-        [userId, tagId]
-    );
+    await withTransaction(async (client) => {
+        await client.query(
+            `INSERT INTO user_tag_follow (user_id, tag_id)
+            VALUES ($1, $2)
+            ON CONFLICT (user_id, tag_id) DO NOTHING`,
+            [userId, tagId]
+        );
+    })
 };
 
 // Unfollow a tag
 const unfollowTag = async (userId, tagId) => {
-    await pool.query(
-        `DELETE FROM user_tag_follow WHERE user_id = $1 AND tag_id = $2`,
-        [userId, tagId]
-    );
+    await withTransaction(async (client) => {
+        await client.query(
+            `DELETE FROM user_tag_follow WHERE user_id = $1 AND tag_id = $2`,
+            [userId, tagId]
+        );
+    });
 };
 
 export default {
