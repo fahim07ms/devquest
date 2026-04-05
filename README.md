@@ -1,12 +1,12 @@
-# DevQuest
+## DevQuest
 
----
 
 A Stack Overflow-style developer Q&A platform built with Next.js, Express.js, and PostgreSQL as part of my CSE Level 2 Term 1 DBMS project. Users can ask and answer questions, vote on content, earn reputation and badges, follow tags, offer bounties, and receive real-time notifications.
 Move down [below](https://github.com/fahim07ms/devquest/#Prerequisites) if you want to set up the project locally right away.
+
 ---
 
-## Key Features
+### Key Features
 
 - **Questions & Answers** — rich text editor (TipTap) with code blocks, image embeds, and math
 - **Voting** — upvote and downvote questions, answers, and comments
@@ -21,7 +21,7 @@ Move down [below](https://github.com/fahim07ms/devquest/#Prerequisites) if you w
 
 ---
 
-## Tech Stack
+### Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
@@ -36,7 +36,7 @@ Move down [below](https://github.com/fahim07ms/devquest/#Prerequisites) if you w
 | Rich text editor | TipTap |
 
 ---
-## Database Schema Overview
+### Database Schema Overview
 
 Below is the ER Diagram of the database (made using [draw.io](drawio.com)):
 
@@ -68,7 +68,7 @@ flag             ← content reports for moderation
 
 ---
 
-## API Overview
+### API Overview
 
 All endpoints are prefixed with `/api`. The backend runs on port `4000` by default.
 
@@ -91,7 +91,7 @@ All endpoints are prefixed with `/api`. The backend runs on port `4000` by defau
 
 Below is a demonstration showing how you can set it up locally.
 
-## Prerequisites
+### Prerequisites
 
 - Node.js 20+
 - npm 10+
@@ -100,7 +100,7 @@ Below is a demonstration showing how you can set it up locally.
 
 ---
 
-## Clone the Repository
+### Clone the Repository
 
 ```bash
 # Clone Backend
@@ -111,7 +111,7 @@ git clone https://github.com/fahim07ms/devquest_frontend.git
 ```
 
 
-## Database Setup
+### Database Setup
 PostgreSQL handles authentication differently depending on your Operating System. Follow the instructions for your platform to create the user and database.
 
 ```bash
@@ -133,7 +133,7 @@ GRANT ALL PRIVILEGES ON DATABASE devquest TO devquest_user;
 \q
 ```
 
-### Initialize the Schema:
+#### Initialize the Schema:
 
 ```bash
 # Navigate to backend
@@ -145,15 +145,15 @@ psql -U devquest_user -d devquest -h localhost -f db/init.sql
 
 ---
 
-## Backend Configuration
+### Backend Configuration
 
-### Install dependencies
+#### Install dependencies
 ```bash
 cd devquest_backend
 npm install
 ```
 
-### Configure environment variables
+#### Configure environment variables
 Create a `.env` file in `devquest_backend/`:
 
 ```bash
@@ -202,16 +202,16 @@ API runs at [http://localhost:4000](http://localhost:4000).
 
 ---
 
-## Frontend
+### Frontend
 
-### Install dependencies
+#### Install dependencies
 
 ```bash
 cd devquest_frontend
 npm install
 ```
 
-### Configure environment variables
+#### Configure environment variables
 
 Create a `.env.local` file in `devquest_frontend/`, then fill in the values:
 
@@ -223,7 +223,7 @@ NEXT_PUBLIC_API_URL=http://localhost:4000/api
 NODE_ENV=development
 ```
 
-### Start the frontend
+#### Start the frontend
 
 ```bash
 npm run dev
