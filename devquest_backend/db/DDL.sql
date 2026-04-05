@@ -178,7 +178,6 @@ CREATE TABLE IF NOT EXISTS "content" (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMPTZ,
     vote_score INTEGER NOT NULL DEFAULT 0,
-    -- Moderator freeze flag: set to TRUE when a flag is resolved with 'action_taken'
     is_frozen BOOLEAN NOT NULL DEFAULT FALSE,
 
     -- Constraints
@@ -224,7 +223,7 @@ CREATE TABLE IF NOT EXISTS "question_tag" (
 CREATE TABLE IF NOT EXISTS "comment" (
     content_id UUID PRIMARY KEY REFERENCES content(content_id) ON DELETE CASCADE,
     parent_id UUID NOT NULL REFERENCES content(content_id) ON DELETE CASCADE,
-    depth_level INTEGER DEFAULT 0,
+    recipient_id UUID REFERENCES "user"(user_id) ON DELETE SET NULL
 
     -- Constraints
     CONSTRAINT no_self_reference CHECK (content_id != parent_id)
@@ -371,12 +370,3 @@ CREATE TABLE IF NOT EXISTS "notification" (
 );
 
 
--- Changes and Updates
-ALTER TABLE comment
-DROP COLUMN depth_level;
-ALTER TABLE comment
-ADD COLUMN recipient_id UUID REFERENCES "user"(user_id) ON DELETE SET NULL;
-
--- Add moderator freeze flag to existing content rows (idempotent)
-ALTER TABLE content
-ADD COLUMN IF NOT EXISTS is_frozen BOOLEAN NOT NULL DEFAULT FALSE;
