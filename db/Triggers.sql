@@ -53,7 +53,6 @@ CREATE TRIGGER trg_update_vote_score
     FOR EACH ROW
 EXECUTE FUNCTION update_vote_score();
 
-
 -- Answer count on question
 CREATE OR REPLACE FUNCTION update_answer_count()
     RETURNS TRIGGER AS
@@ -81,7 +80,6 @@ CREATE TRIGGER trg_update_answer_count
     FOR EACH ROW
 EXECUTE FUNCTION update_answer_count();
 
-
 -- Update badge count on a user when a badge is awarded or removed in the badge_award table
 CREATE OR REPLACE FUNCTION update_badge_count()
     RETURNS TRIGGER AS
@@ -106,7 +104,6 @@ CREATE TRIGGER trg_update_badge_count
     AFTER INSERT OR DELETE ON badge_award
     FOR EACH ROW
 EXECUTE FUNCTION update_badge_count();
-
 
 -- Update user reputation points on a user when a reputation history record is inserted or deleted
 CREATE OR REPLACE FUNCTION update_reputation_points()
@@ -535,7 +532,6 @@ CREATE TRIGGER trg_eval_badges_content
     AFTER INSERT ON content
     FOR EACH ROW
 EXECUTE FUNCTION trigger_evaluate_badges_content();
-
 
 -- Evaluate badges when a vote is cast (score-based badges)
 CREATE OR REPLACE FUNCTION trigger_evaluate_badges_vote() RETURNS TRIGGER AS $$

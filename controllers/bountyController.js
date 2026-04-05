@@ -43,7 +43,7 @@ export const createBounty = async (req, res) => {
 };
 
 // Award a bounty to a specific answer
-export const awardBounty = async (req, res) => {
+export const  awardBounty = async (req, res) => {
     const { bountyId } = req.params;
     const { answerId } = req.body;
     const userId = req.userId;
