@@ -1,5 +1,7 @@
 # DevQuest
 
+---
+
 A Stack Overflow-style developer Q&A platform built with Next.js, Express.js, and PostgreSQL as part of my CSE Level 2 Term 1 DBMS project. Users can ask and answer questions, vote on content, earn reputation and badges, follow tags, offer bounties, and receive real-time notifications.
 Move down [below](https://github.com/fahim07ms/devquest/#Prerequisites) if you want to set up the project locally right away.
 ---
