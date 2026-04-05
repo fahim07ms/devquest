@@ -40,6 +40,7 @@ export interface UserProfile {
     bio?: string
     website?: string
     profilePicture?: string
+    acceptanceRate?: number
 }
 
 
@@ -129,7 +130,7 @@ export default function UserProfilePage() {
                     api.get(`/users/${username}`),
                     api.get(`/users/${username}/questions`),
                     api.get(`/users/${username}/answers`),
-                ])
+                ]);
                 setProfile(profileRes.data.data.user)
                 setQuestions(questionsRes.data.data.questions ?? [])
                 setAnswers(answersRes.data.data.answers ?? [])
@@ -306,6 +307,14 @@ export default function UserProfilePage() {
                     <StatPill icon={MedalIcon}    label="badges"     value={profile.badgeCount} />
                     <StatPill icon={ChatDotsIcon} label="questions"  value={questions.length} />
                     <StatPill icon={ArrowUpIcon}  label="answers"    value={answers.length} />
+
+                    {profile.acceptanceRate !== undefined && (
+                        <StatPill
+                            icon={CheckCircleIcon}
+                            label="acceptance rate"
+                            value={profile.acceptanceRate + '%'}
+                        />
+                    )}
                 </div>
 
                 {/* ── Tabs ── */}

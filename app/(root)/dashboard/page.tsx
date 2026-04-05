@@ -31,6 +31,8 @@ interface DashboardStats {
     firstName: string | null
     lastName: string | null
     profilePicture: string | null
+    bio: string | null
+    website: string | null
     reputationPoints: number
     badgeCount: number
     questionCount: number
@@ -38,6 +40,7 @@ interface DashboardStats {
     acceptedAnswerCount: number
     followedTagCount: number
     createdAt: string
+    acceptanceRate: number | null
 }
 
 interface FollowedTag {
@@ -65,7 +68,7 @@ function StatCard({
 }) {
     const inner = (
         <div className={cn(
-            'flex items-start gap-3 px-4 py-4 border border-border/40 bg-card transition-colors duration-150',
+            'flex items-start gap-3 px-4 py-4 border border-border/40 bg-card h-full transition-colors duration-150 ',
             href && 'hover:border-primary/30 hover:bg-primary/[0.02] cursor-pointer'
         )}>
             <div className="flex-shrink-0 h-8 w-8 flex items-center justify-center bg-muted/60 border border-border/40 mt-0.5">
@@ -183,7 +186,7 @@ export default function DashboardPage() {
                     ))}
                 </div>
             ) : stats && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3 mb-8">
                     <StatCard
                         icon={TrophyIcon}
                         label="reputation"
@@ -215,6 +218,13 @@ export default function DashboardPage() {
                         value={stats.followedTagCount}
                         href="/tags"
                     />
+                    {stats.acceptanceRate !== undefined && (
+                        <StatCard
+                            icon={CheckCircleIcon}
+                            label="acceptance rate"
+                            value={stats.acceptanceRate + '%'}
+                        />
+                    )}
                 </div>
             )}
 

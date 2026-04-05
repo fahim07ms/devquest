@@ -38,7 +38,7 @@ export function RegisterPage() {
             toast.success("Account created successfully!");
             router.push('/login');
         } catch (error) {
-            console.error("Registration failed", error);
+            //console.error("Registration failed", error);
             toast.error(error.response.data.message || "Registration failed. Please try again.");
         } finally {
             setIsLoading(false);

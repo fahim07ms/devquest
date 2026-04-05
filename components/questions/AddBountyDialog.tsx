@@ -37,7 +37,7 @@ export function AddBountyDialog({
                 reason: reason.trim(),
             })
             const bounty = res.data.data.bounty
-            onSuccess({ id: bounty.bounty_id, amount: bounty.amount, expiresAt: bounty.expires_at })
+            onSuccess({ id: bounty.id, amount: bounty.amount, expiresAt: bounty.expiresAt })
             toast.success('Bounty posted successfully.')
             onClose()
         } catch (err: any) {

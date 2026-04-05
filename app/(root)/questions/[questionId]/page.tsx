@@ -232,6 +232,7 @@ export default function QuestionDetailPage() {
 
     const handleBountyAdded = (bounty: { id: string; amount: number; expiresAt: string }) => {
         setQuestion(prev => prev ? { ...prev, activeBounty: bounty } : null)
+        console.log('Bounty added:', bounty);
     }
 
     const currentUserId     = user?.id
